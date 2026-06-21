@@ -1,0 +1,8 @@
+{
+  "_comment": "Approximate centroid for each US ZIP3 prefix (first 3 digits of a 5-digit ZIP): [lat, lon, label]. A prefix resolves ANY future 5-digit zip to its rough location, so real zipcodes drop in with no code change. Seeded with the prefixes used today; drop in the full ~900-row table to cover all of the US.",
+  "941": [37.7749, -122.4194, "San Francisco, CA"],
+  "981": [47.6062, -122.3321, "Seattle, WA"],
+  "021": [42.3399, -71.0899, "Boston, MA"],
+  "606": [41.8781, -87.6532, "Chicago, IL"],
+  "850": [33.4484, -112.0740, "Phoenix, AZ"]
+}

@@ -10,17 +10,33 @@ the current RL/training path and placeholder dynamics that Synthea can replace.
 
 ## Dashboard
 
-The dashboard is a read-only FastAPI app plus a single-page frontend. It consumes
-Casey's Synthea-derived patient state and response-model outputs plus William's
-HUD training/eval exports, then renders the agent's production replay.
+The dashboard is a read-only FastAPI app plus a frontend. It consumes Casey's
+Synthea-derived patient state and response-model outputs plus William's HUD
+training/eval exports, then renders the agent's production replay.
 
-Run it:
+### Frontend (Next.js — primary, animated)
+
+`web/` is the rehauled control room: a live US **zipcode map** with animated
+allocation flow lines from the agent to each location, money + people totals by
+region and by person, the agent's tool calls, and a replay engine over the
+playback rounds. See `web/README.md`.
 
 ```bash
+# 1) API
 uvicorn app.main:app --reload --port 8000
+
+# 2) Web (in web/)
+cd web && npm install && npm run dev   # http://localhost:3000
 ```
 
-Open `http://127.0.0.1:8000`.
+Geo is **zipcode-driven**: physicians carry a `zip`, resolved to lat/lon/city by
+`app/geo.py` via a ZIP3-prefix centroid table (`data/geo/`). Real zipcodes can be
+added to the data later and plot correctly with no code change.
+
+### Legacy static page
+
+The original single-page demo is still served by FastAPI at `http://127.0.0.1:8000`
+(the `static/` dir) for the no-build path.
 
 The API uses fixture JSON by default. Swap in real exports with env vars:
 
@@ -59,7 +75,8 @@ Dashboard endpoints:
 
 - `GET /api/health`
 - `GET /api/patients`
-- `GET /api/physicians`
+- `GET /api/physicians` (now includes `zip`/`lat`/`lon`/`city`)
+- `GET /api/geo` (one resolved geo point per physician)
 - `GET /api/rounds`
 - `GET /api/eval`
 - `GET /api/playback`

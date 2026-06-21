@@ -82,6 +82,50 @@ class DashboardApiTest(unittest.TestCase):
         )
         self.assertGreater(policies["trained"]["spend_efficiency_index"], 0)
 
+    def test_physicians_carry_resolved_geo(self) -> None:
+        response = self.client.get("/api/physicians")
+
+        self.assertEqual(response.status_code, 200)
+        physicians = response.json()
+        self.assertGreater(len(physicians), 0)
+        for physician in physicians:
+            self.assertIn("zip", physician)
+            self.assertIsInstance(physician["lat"], float)
+            self.assertIsInstance(physician["lon"], float)
+            # Contiguous-US sanity bounds (incl. resolved zip3 centroids).
+            self.assertTrue(24.0 <= physician["lat"] <= 50.0)
+            self.assertTrue(-125.0 <= physician["lon"] <= -66.0)
+            self.assertTrue(physician["city"])
+
+    def test_geo_endpoint_returns_one_point_per_physician(self) -> None:
+        physicians = self.client.get("/api/physicians").json()
+        geo_points = self.client.get("/api/geo").json()
+
+        self.assertEqual(len(geo_points), len(physicians))
+        self.assertEqual(
+            {point["physician_id"] for point in geo_points},
+            {physician["physician_id"] for physician in physicians},
+        )
+
+    def test_dashboard_top_level_keys_unchanged(self) -> None:
+        # Geo enrichment must stay additive: no new top-level dashboard keys.
+        payload = self.client.get("/api/dashboard").json()
+        self.assertEqual(
+            sorted(payload.keys()),
+            [
+                "dose_response",
+                "eval_summaries",
+                "overview",
+                "patients",
+                "physicians",
+                "playback",
+                "rounds",
+                "sensitivity",
+                "task_results",
+                "training_curve",
+            ],
+        )
+
     def test_training_and_response_exports_exist(self) -> None:
         response = self.client.get("/api/dashboard")
 

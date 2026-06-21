@@ -12,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app import geo
+
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = ROOT / "data" / "fixtures"
@@ -37,6 +39,21 @@ class PhysicianView(BaseModel):
     dossier_summary: str
     saturation_band: Literal["fresh", "warming", "near_saturation"]
     cumulative_sponsorship_usd: float
+    # Zipcode-driven geo. ``zip`` is the (future) source of truth; lat/lon/city are
+    # resolved server-side so the frontend can plot allocations on the US map.
+    zip: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    city: str | None = None
+
+
+class GeoPointView(BaseModel):
+    physician_id: str
+    region: str
+    zip: str | None
+    lat: float
+    lon: float
+    city: str
 
 
 class RoundResult(BaseModel):
@@ -209,10 +226,32 @@ class DataRepository:
     def physicians(self) -> list[PhysicianView]:
         sqlite_path = os.environ.get("CASEY_SQLITE_PATH")
         if sqlite_path:
-            return self._physicians_from_sqlite(Path(sqlite_path))
+            rows = self._physicians_from_sqlite(Path(sqlite_path))
+        else:
+            rows = [
+                PhysicianView.model_validate(row)
+                for row in self._load_json("PHYSICIANS_JSON", "physicians.json")
+            ]
+        return [self._attach_geo(physician) for physician in rows]
+
+    @staticmethod
+    def _attach_geo(physician: PhysicianView) -> PhysicianView:
+        point = geo.resolve(physician.zip, physician.region)
+        return physician.model_copy(
+            update={"lat": point.lat, "lon": point.lon, "city": point.city}
+        )
+
+    def geo_points(self) -> list[GeoPointView]:
         return [
-            PhysicianView.model_validate(row)
-            for row in self._load_json("PHYSICIANS_JSON", "physicians.json")
+            GeoPointView(
+                physician_id=physician.physician_id,
+                region=physician.region,
+                zip=physician.zip,
+                lat=physician.lat if physician.lat is not None else 0.0,
+                lon=physician.lon if physician.lon is not None else 0.0,
+                city=physician.city or "Unknown",
+            )
+            for physician in self.physicians()
         ]
 
     def rounds(self) -> list[RoundResult]:
@@ -415,6 +454,11 @@ def get_patients() -> list[PatientView]:
 @app.get("/api/physicians", response_model=list[PhysicianView])
 def get_physicians() -> list[PhysicianView]:
     return repository().physicians()
+
+
+@app.get("/api/geo", response_model=list[GeoPointView])
+def get_geo() -> list[GeoPointView]:
+    return repository().geo_points()
 
 
 @app.get("/api/rounds", response_model=list[RoundResult])

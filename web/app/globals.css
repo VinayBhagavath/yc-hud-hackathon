@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Offline-safe font stacks (no network font fetch). */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: #0a0b0f;
+  background-image:
+    radial-gradient(1200px 600px at 50% -10%, rgba(52, 211, 153, 0.06), transparent 70%),
+    radial-gradient(900px 500px at 100% 0%, rgba(80, 120, 255, 0.05), transparent 70%);
+  color: #e8ecf4;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+/* Thin, dark scrollbars for the feed panels. */
+.scroll-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: #222634;
+  border-radius: 999px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel {
+  background: linear-gradient(180deg, #12141d 0%, #0e1016 100%);
+  border: 1px solid #1c2030;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
+    0 8px 40px -16px rgba(0, 0, 0, 0.8);
+}
+
+.hairline {
+  border-color: #1c2030;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-anim {
+    animation: none !important;
+  }
+}

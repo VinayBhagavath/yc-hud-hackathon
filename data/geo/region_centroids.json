@@ -1,0 +1,8 @@
+{
+  "_comment": "Fallback centroid per named macro-region: [lat, lon, label]. Used when a physician has no zip yet, or its zip3 prefix is not in zip3_centroids.json.",
+  "Bay Area": [37.7749, -122.4194, "San Francisco, CA"],
+  "Pacific Northwest": [47.6062, -122.3321, "Seattle, WA"],
+  "Northeast": [42.3399, -71.0899, "Boston, MA"],
+  "Midwest": [41.8781, -87.6532, "Chicago, IL"],
+  "Southwest": [33.4484, -112.0740, "Phoenix, AZ"]
+}
