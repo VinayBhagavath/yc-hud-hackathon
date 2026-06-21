@@ -1,121 +1,89 @@
 """HUD environment: fund providers to maximize patient medication uptake.
 
-Decision flow
--------------
-The policy agent allocates a fixed budget across *providers* (not patients).
-Each provider serves a panel of patients. Whether a patient ends up medicated
-is decided by a reward function that, in production, will be **Synthea**
-(synthetic patient generation with transition-modeled provider preferences).
+HUD templates are strictly single-turn: `yield prompt` -> (agent acts) ->
+`yield reward`. Multi-step work happens in a WORKSPACE shell between those two
+yields (the documented pattern), NOT via extra yields.
 
-Until Synthea is wired in, the reward dynamics in dynamics.py use a
-deterministic PLACEHOLDER rule so the full pipeline (episode loop, budget
-refresh, training) runs end-to-end with a learnable, allocation-sensitive
-reward.
+So the 3-round episode is driven by the agent running `python apply_round.py` in
+its workspace once per round. Each round the budget refreshes, some patients get
+medicated, and medicated patients are removed (sticky). The reward is the final
+medicated fraction, read back from the workspace state.
 
-Episode structure (3 rounds)
-----------------------------
-Per episode the agent allocates ``rounds`` (=3) times. Each round:
-  1. the budget is fully refreshed to ``budget``,
-  2. the agent funds providers,
-  3. some currently-unmedicated patients become medicated,
-  4. medicated patients are REMOVED for subsequent rounds (sticky).
-Final reward = (total patients medicated across all rounds) / (initial count),
-already in [0, 1] -- no oracle/normalization needed.
+  reward = total patients medicated / initial patient count   in [0, 1]
 
-Two ways to drive the 3 rounds:
-  * ``allocate``      -- multi-turn generator (cleanest). Relies on HUD driving
-                         templates as true multi-turn generators. VERIFY against
-                         the live HUD docs skill before depending on it.
-  * ``allocate_tool`` -- single-prompt + workspace round-driver tool (safe
-                         fallback matching the documented "deliverable is
-                         workspace state + tools" pattern). See round_driver.py.
+Reward source: the per-round rule is a deterministic PLACEHOLDER (in
+apply_round.py / dynamics.run_round). Synthea replaces only that rule later.
 """
 
 from __future__ import annotations
 
 import json
+import shutil
+import tempfile
 from pathlib import Path
 
 from hud import Environment
 
-from dynamics import make_cohort, run_round, parse_alloc, public_view
+from dynamics import make_cohort
 
 env = Environment(name="provider-allocation", version="0.0.1")
 
-# Workspace the agent reads/writes. Authoritative reward state (hidden
-# thresholds, medicated set, round logic) lives OUTSIDE it so the agent cannot
-# tamper with its own reward.
-ROOT = Path("/workspace")
+# A bash shell + filesystem the agent can read/write (the documented capability).
+# Fresh per rollout (each rollout runs in its own env process/container).
+WORKSPACE = Path(tempfile.mkdtemp(prefix="hud-provider-alloc-"))
+ws = env.workspace(WORKSPACE, network=False)
+
+_APPLY_SRC = Path(__file__).resolve().parent / "apply_round.py"
 
 
-# --------------------------------------------------------------------------- #
-# Multi-turn generator template (cleanest; verify multi-turn support)
-# --------------------------------------------------------------------------- #
 @env.template()
 async def allocate(seed: int = 0, budget: float = 4000.0, rounds: int = 3):
     providers, thresholds = make_cohort(seed)
     n_total = len(thresholds)
-    unmedicated = set(thresholds)
-    medicated = 0
 
-    for r in range(rounds):
-        ROOT.mkdir(parents=True, exist_ok=True)
-        (ROOT / "patients.json").write_text(
-            json.dumps(public_view(providers, unmedicated), indent=2)
-        )
-        answer = yield (
-            f"Round {r + 1}/{rounds}. Budget ${budget:.0f} (fully refreshed this round). "
-            f"{len(unmedicated)} patients still need medication; provider panels are in "
-            f"/workspace/patients.json. Decide how much to fund each provider and write it "
-            f'to /workspace/alloc.json as {{"<provider_id>": <amount>}}. Total must not '
-            f"exceed the budget. Patients you medicate stay medicated; aim to medicate as "
-            f"many patients as possible across all {rounds} rounds."
-        )
-        alloc = parse_alloc(answer)
-        if sum(alloc.values()) > budget:
-            continue  # over budget -> wasted round
-        newly = run_round(providers, unmedicated, thresholds, alloc)
-        unmedicated -= newly
-        medicated += len(newly)
+    # Hidden authoritative state (includes thresholds -- not shown to the agent).
+    state = {
+        "providers": providers,                       # id, region, patient ids
+        "thresholds": {str(k): v for k, v in thresholds.items()},
+        "unmedicated": sorted(thresholds),
+        "medicated": 0,
+        "round": 0,
+        "rounds": rounds,
+        "budget": budget,
+        "n_total": n_total,
+        "reward": 0.0,
+    }
+    (WORKSPACE / ".state.json").write_text(json.dumps(state))
 
-    yield medicated / n_total if n_total else 0.0
+    # Public view: providers + region + remaining patient ids, NO cost info.
+    view = [{"id": p["id"], "region": p["region"], "patients": p["patients"]}
+            for p in providers]
+    (WORKSPACE / "patients.json").write_text(json.dumps(view, indent=2))
 
+    # Clear any stale files and drop the round driver in the workspace.
+    for f in ("alloc.json", "results.json"):
+        (WORKSPACE / f).unlink(missing_ok=True)
+    shutil.copy(_APPLY_SRC, WORKSPACE / "apply_round.py")
 
-# --------------------------------------------------------------------------- #
-# Single-prompt + workspace round-driver fallback
-# --------------------------------------------------------------------------- #
-@env.template()
-async def allocate_tool(seed: int = 0, budget: float = 4000.0, rounds: int = 3):
-    """Single-turn variant: the agent runs `python /authoritative/round_driver.py`
-    after each write to /workspace/alloc.json. The driver applies the round,
-    refreshes the budget, removes medicated patients, and updates
-    /workspace/patients.json and /workspace/state.json. Final reward is read back
-    from state.json. Authoritative state lives under /authoritative.
-    """
-    providers, thresholds = make_cohort(seed)
-    n_total = len(thresholds)
-
-    ROOT.mkdir(parents=True, exist_ok=True)
-    auth = Path("/authoritative")
-    auth.mkdir(parents=True, exist_ok=True)
-    (auth / "thresholds.json").write_text(json.dumps(thresholds))
-    (auth / "providers.json").write_text(json.dumps(providers))
-    (auth / "config.json").write_text(
-        json.dumps({"budget": budget, "rounds": rounds, "round": 0,
-                    "medicated": [], "n_total": n_total})
-    )
-    (ROOT / "patients.json").write_text(
-        json.dumps(public_view(providers, set(thresholds)), indent=2)
+    answer = yield (
+        f"You have a bash shell in your working directory and ${budget:.0f} to allocate "
+        f"across healthcare providers in EACH of {rounds} rounds (the budget refreshes "
+        f"every round). Goal: medicate as many patients as possible across all rounds.\n\n"
+        f"`patients.json` lists providers, each with a `region` and the ids of patients "
+        f"who still need medication. A patient becomes medicated when the funding you give "
+        f"their provider -- split evenly across that provider's listed patients -- is "
+        f"enough for them. Medicated patients stay medicated and are removed from later "
+        f"rounds. (Hint: cost-effectiveness correlates with region.)\n\n"
+        f"Each round:\n"
+        f"  1. read patients.json\n"
+        f'  2. write your funding to alloc.json as {{"<provider_id>": <amount>}}, '
+        f"total <= ${budget:.0f}\n"
+        f"  3. run `python apply_round.py`  (it reports results and refreshes patients.json)\n"
+        f"Repeat for all {rounds} rounds, then reply 'done'."
     )
 
-    yield (
-        f"You have {rounds} funding rounds. Each round: read /workspace/patients.json, "
-        f"write your provider funding to /workspace/alloc.json as "
-        f'{{"<provider_id>": <amount>}} (total <= ${budget:.0f}, refreshed every round), '
-        f"then run `python /authoritative/round_driver.py` to apply it. Repeat until all "
-        f"{rounds} rounds are used. Maximize total patients medicated; medicated patients "
-        f"stay medicated and are removed from later rounds."
-    )
-
-    state = json.loads((ROOT / "state.json").read_text())
-    yield state.get("reward", 0.0)
+    try:
+        final = json.loads((WORKSPACE / ".state.json").read_text())
+        yield float(final.get("reward", 0.0))
+    except Exception:  # noqa: BLE001
+        yield 0.0

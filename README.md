@@ -29,21 +29,21 @@ thing Synthea replaces; see `<<< SYNTHEA SWAPS IN >>>` in `dynamics.py`.
 | File | Purpose |
 |------|---------|
 | `dynamics.py` | Pure reward logic (cohort gen + per-round medication rule). No HUD dep. **Synthea swaps in here.** |
-| `env.py` | HUD `Environment` + two task templates (`allocate`, `allocate_tool`). |
-| `round_driver.py` | Workspace tool for the `allocate_tool` fallback path. |
-| `tasks.py` | Seed × budget sweep → the taskset (gives GRPO reward variance). |
+| `env.py` | HUD `Environment` + the `allocate` task template (workspace shell). |
+| `apply_round.py` | Round driver the agent runs in its workspace shell once per round. |
+| `tasks.py` | Seed × budget sweep → `tasks` (eval) and `taskset` (train). |
 | `train.py` | GRPO training loop. |
 | `sanity_check.py` | Offline probe: confirms reward is allocation-sensitive (no HUD needed). |
+| `Dockerfile.hud` / `pyproject.toml` | Packaging for `hud deploy`. |
 
-## Two ways the 3 rounds are driven
+## How the 3 rounds work
 
-- **`allocate`** (default) — multi-turn generator: yields a prompt per round,
-  receives an allocation, mutates state, yields the final reward. Cleanest, but
-  assumes HUD drives templates as true multi-turn generators. **Verify this
-  against the HUD docs skill** before a long run.
-- **`allocate_tool`** (fallback) — single prompt; the agent writes
-  `/workspace/alloc.json` and runs `round_driver.py` each round. Matches HUD's
-  documented "deliverable is workspace state + tools" pattern with no ambiguity.
+HUD templates are single-turn (`yield prompt` → agent acts → `yield reward`);
+multi-step work happens in a **workspace shell** between the two yields. So the
+agent drives the 3 rounds by running `python apply_round.py` once per round:
+read `patients.json` → write `alloc.json` → run the driver (applies the round,
+removes medicated patients, refreshes the budget, rewrites `patients.json`).
+The template reads the final state to compute the reward.
 
 ## Run it
 
