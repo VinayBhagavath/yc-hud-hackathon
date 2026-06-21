@@ -20,14 +20,30 @@ Indication: **Type 2 Diabetes**, marketing a branded GLP-1. The convertible
 not already on a GLP-1 (trivially all -- Synthea models no GLP-1s, which is the
 white-space the brand team is selling into).
 
-What is real vs synthetic
--------------------------
-- REAL (from Synthea): which providers exist, their geography & patient volume,
-  which of their patients are undertreated diabetics, and each panel's clinical
-  profile (avg HbA1c). These are the agent's observable features.
-- SYNTHETIC (here): ``k`` -- the marketing dollars needed to convert a patient.
-  No dataset models promotion-response, so we build it from the REAL features
-  (city cost-tier) + hidden noise. This is the only invented piece.
+The cost-to-convert model (``k``)
+---------------------------------
+``k`` = the marketing dollars to convert one patient. No dataset models
+promotion-response, so we synthesize it -- but deliberately as a **weak prior
+over REAL observable features plus a DOMINANT hidden residual**:
+
+    k = BASE * exp(-beta . z(features)) * exp(RESID_SIGMA * residual) * jitter
+              \___ weak, learnable ___/   \___ dominant, must be probed ___/
+
+Why this shape (see SYNTHEA_INTEGRATION.md "Design rationale"):
+- If features *fully* determined k, a strong base model would zero-shot the
+  answer ("fund the big, sick, already-escalated panels") and the GRPO training
+  curve would be flat -- nothing to learn.
+- Making the residual dominant means observable features only give a *prior*;
+  the winning policy must spend, observe who converted, and reallocate across
+  the 3 rounds. That's realistic (you don't know a doc's true responsiveness
+  until you promote and measure) and it's what gives a real training signal.
+
+REAL (from Synthea), exposed to the agent:
+  - volume             provider patient-volume (bigger -> cheaper prior)
+  - avg_hba1c          panel severity (sicker -> cheaper prior)
+  - escalation_affinity share of the provider's diabetics already on insulin,
+                       i.e. willing to escalate therapy (higher -> cheaper prior)
+SYNTHETIC, hidden: the per-provider residual + per-patient jitter (-> thresholds).
 """
 
 from __future__ import annotations
@@ -37,7 +53,7 @@ import hashlib
 import json
 import math
 import os
-import random
+import statistics as st
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -56,20 +72,21 @@ CACHE_JSON = Path(__file__).with_name("cohort_data.json")
 T2D_CODE = "44054006"            # SNOMED: Diabetes mellitus type 2 (disorder)
 HBA1C_CODE = "4548-4"           # LOINC: Hemoglobin A1c
 UNCONTROLLED_HBA1C = 7.0         # ADA control target is <7%; >= 7 == undertreated
+INSULIN_KEY = "insulin"          # escalation marker in medication DESCRIPTION
 
-# Cost-to-convert model (dollars per patient). Mirrors the scale of the
-# placeholder REGION_THRESHOLDS (~80-700). City is the OBSERVABLE, learnable
-# signal; the provider residual and per-patient jitter are HIDDEN.
+# Cost-to-convert model. ``BETA`` is the WEAK feature prior (signs: bigger /
+# sicker / more-escalated -> cheaper, lower k). ``RESID_SIGMA`` is the DOMINANT
+# hidden residual -- intentionally larger than the feature spread so the task
+# rewards exploration, not just zero-shot reasoning.
 BASE_COST = 200.0
-CITY_TIERS = (0.5, 1.0, 2.0)     # cheap / mid / expensive, assigned per-city
-RESID_SIGMA = 0.30               # hidden per-provider lognormal spread
-JITTER = (0.85, 1.15)            # hidden per-patient multiplier band
+BETA = {"volume": 0.25, "avg_hba1c": 0.20, "escalation_affinity": 0.35}
+RESID_SIGMA = 0.80               # hidden per-provider lognormal spread (DOMINANT)
+JITTER = (0.90, 1.10)            # hidden per-patient multiplier band
 
 DEFAULT_PROVIDERS_PER_TASK = 8
 MIN_PANEL = 2                    # ignore providers with a tiny undertreated panel
 
-CSV_FIELD_LIMIT = sys.maxsize
-csv.field_size_limit(CSV_FIELD_LIMIT)
+csv.field_size_limit(sys.maxsize)
 
 
 # --------------------------------------------------------------------------- #
@@ -77,20 +94,14 @@ csv.field_size_limit(CSV_FIELD_LIMIT)
 # --------------------------------------------------------------------------- #
 def _h(*parts) -> float:
     """Stable hash of the parts -> float in [0, 1)."""
-    s = "|".join(str(p) for p in parts)
-    d = hashlib.sha256(s.encode()).hexdigest()
+    d = hashlib.sha256("|".join(str(p) for p in parts).encode()).hexdigest()
     return int(d[:8], 16) / 0xFFFFFFFF
 
 
-def _city_tier(city: str) -> float:
-    return CITY_TIERS[int(_h("city", city) * len(CITY_TIERS))]
-
-
 def _provider_resid(provider_id: str) -> float:
-    # lognormal-ish hidden residual, stable per provider, NOT observable
+    """Dominant hidden residual, stable per provider, NOT observable."""
     u = _h("resid", provider_id)
-    # map uniform -> approx normal via inverse-erf-free trick (two-sample)
-    v = _h("resid2", provider_id)
+    v = _h("resid2", provider_id)            # Box-Muller -> approx normal
     z = math.sqrt(-2 * math.log(max(u, 1e-9))) * math.cos(2 * math.pi * v)
     return math.exp(RESID_SIGMA * z)
 
@@ -103,7 +114,7 @@ def _patient_jitter(patient_id: str) -> float:
 # --------------------------------------------------------------------------- #
 # Load + parse Synthea CSVs once, cache the derived provider pool
 # --------------------------------------------------------------------------- #
-_POOL = None  # cached list of provider dicts (UUID-keyed, full population)
+_POOL = None
 
 
 def _stream(name: str):
@@ -116,70 +127,92 @@ def _stream(name: str):
         yield from csv.DictReader(f)
 
 
+def _zscore(values):
+    """Return a function mapping value -> z-score for this population."""
+    mean = st.mean(values)
+    sd = st.pstdev(values) or 1.0
+    return lambda x: (x - mean) / sd
+
+
 def _build_pool():
     """Parse Synthea -> list of providers, each with an undertreated diabetic
-    panel and a hidden cost-to-convert per patient. Cached after first call."""
+    panel and a hidden cost-to-convert per patient (weak feature prior +
+    dominant residual). The z-score standardization is over the qualifying
+    provider pool, so it is stable for a fixed dataset (recompute when you
+    regenerate)."""
     # 1. diabetics
-    diabetic = {row["PATIENT"] for row in _stream("conditions.csv")
-                if row["CODE"] == T2D_CODE}
+    diabetic = {r["PATIENT"] for r in _stream("conditions.csv")
+                if r["CODE"] == T2D_CODE}
 
     # 2. latest HbA1c per diabetic
-    latest = {}  # patient -> (date, value)
-    for row in _stream("observations.csv"):
-        if row["CODE"] != HBA1C_CODE or row["PATIENT"] not in diabetic:
+    latest = {}
+    for r in _stream("observations.csv"):
+        if r["CODE"] != HBA1C_CODE or r["PATIENT"] not in diabetic:
             continue
         try:
-            val = float(row["VALUE"])
+            val = float(r["VALUE"])
         except (ValueError, KeyError):
             continue
-        d = row["DATE"]
-        if row["PATIENT"] not in latest or d > latest[row["PATIENT"]][0]:
-            latest[row["PATIENT"]] = (d, val)
+        if r["PATIENT"] not in latest or r["DATE"] > latest[r["PATIENT"]][0]:
+            latest[r["PATIENT"]] = (r["DATE"], val)
 
-    # 3. undertreated = diabetic + uncontrolled
+    # 3. undertreated = diabetic + uncontrolled (the convertible pool, n_i)
     undertreated = {p: v for p, (_, v) in latest.items() if v >= UNCONTROLLED_HBA1C}
 
-    # 4. attribute each undertreated patient to their most-frequent provider
-    visits = defaultdict(Counter)  # patient -> Counter(provider)
-    for row in _stream("encounters.csv"):
-        p = row["PATIENT"]
-        prov = row["PROVIDER"]
-        if p in undertreated and prov:
-            visits[p][prov] += 1
-    panel = defaultdict(list)      # provider -> [patient...]
+    # 4. escalation: diabetics already on insulin (proxy for "willing to escalate")
+    insulin = {r["PATIENT"] for r in _stream("medications.csv")
+               if INSULIN_KEY in r["DESCRIPTION"].lower()}
+
+    # 5. attribute every diabetic to their most-frequent provider
+    visits = defaultdict(Counter)
+    for r in _stream("encounters.csv"):
+        if r["PATIENT"] in diabetic and r["PROVIDER"]:
+            visits[r["PATIENT"]][r["PROVIDER"]] += 1
+    prov_all, prov_under = defaultdict(list), defaultdict(list)
     for p, counter in visits.items():
         prov = counter.most_common(1)[0][0]
-        panel[prov].append(p)
+        prov_all[prov].append(p)
+        if p in undertreated:
+            prov_under[prov].append(p)
 
-    # 5. provider metadata
-    meta = {}
-    for row in _stream("providers.csv"):
-        meta[row["Id"]] = {
-            "city": row["CITY"], "state": row["STATE"],
-            "volume": int(row["ENCOUNTERS"] or 0),
-        }
+    # 6. provider metadata
+    meta = {r["Id"]: {"city": r["CITY"], "state": r["STATE"],
+                      "volume": int(r["ENCOUNTERS"] or 0)}
+            for r in _stream("providers.csv")}
 
-    # 6. assemble pool
-    pool = []
-    for prov, patients in panel.items():
-        if len(patients) < MIN_PANEL or prov not in meta:
+    # 7. raw observable features for qualifying providers
+    raw = []
+    for prov, under in prov_under.items():
+        if len(under) < MIN_PANEL or prov not in meta:
             continue
-        m = meta[prov]
-        hba1cs = [undertreated[p] for p in patients]
-        pool.append({
+        alldiab = prov_all[prov]
+        raw.append({
             "uuid": prov,
-            "city": m["city"],
-            "state": m["state"],
-            "volume": m["volume"],
-            "patients": patients,                 # patient UUIDs
-            "avg_hba1c": round(sum(hba1cs) / len(hba1cs), 2),
-            "thresholds": {                        # hidden $-to-convert per patient
-                p: round(BASE_COST * _city_tier(m["city"])
-                         * _provider_resid(prov) * _patient_jitter(p), 1)
-                for p in patients
-            },
+            "city": meta[prov]["city"], "state": meta[prov]["state"],
+            "volume": meta[prov]["volume"],
+            "avg_hba1c": round(st.mean(undertreated[p] for p in under), 2),
+            "escalation_affinity": round(
+                sum(p in insulin for p in alldiab) / len(alldiab), 3),
+            "under": under,
         })
-    pool.sort(key=lambda d: d["uuid"])  # stable order
+    if not raw:
+        return []
+
+    # 8. standardize features over the pool, then assign the hidden thresholds
+    zf = {f: _zscore([r[f] for r in raw]) for f in BETA}
+    pool = []
+    for r in raw:
+        log_prior = -sum(BETA[f] * zf[f](r[f]) for f in BETA)   # weak prior
+        base_k = BASE_COST * math.exp(log_prior) * _provider_resid(r["uuid"])
+        pool.append({
+            "uuid": r["uuid"], "city": r["city"], "state": r["state"],
+            "volume": r["volume"], "avg_hba1c": r["avg_hba1c"],
+            "escalation_affinity": r["escalation_affinity"],
+            "patients": r["under"],
+            "thresholds": {p: round(base_k * _patient_jitter(p), 1)
+                           for p in r["under"]},
+        })
+    pool.sort(key=lambda d: d["uuid"])
     return pool
 
 
@@ -213,6 +246,10 @@ def _pool():
 # --------------------------------------------------------------------------- #
 # Public API: drop-in replacements for dynamics.make_cohort / public_view
 # --------------------------------------------------------------------------- #
+# Observable features handed to the agent (the cost-predictive ones).
+FEATURES = ("volume", "avg_hba1c", "escalation_affinity")
+
+
 def make_cohort(seed: int, n_providers: int = DEFAULT_PROVIDERS_PER_TASK,
                 panel: int | None = None):
     """Sample a task from the real Synthea pool.
@@ -223,9 +260,9 @@ def make_cohort(seed: int, n_providers: int = DEFAULT_PROVIDERS_PER_TASK,
     matching ``dynamics.make_cohort``. ``panel`` is accepted for signature
     compatibility and ignored (panel sizes come from real data).
     """
+    import random
     pool = _pool()
-    rng = random.Random(seed)
-    chosen = rng.sample(pool, min(n_providers, len(pool)))
+    chosen = random.Random(seed).sample(pool, min(n_providers, len(pool)))
 
     providers_public, thresholds = [], {}
     next_pid = 0
@@ -237,9 +274,10 @@ def make_cohort(seed: int, n_providers: int = DEFAULT_PROVIDERS_PER_TASK,
             next_pid += 1
         providers_public.append({
             "id": j,
-            "region": prov["city"],          # OBSERVABLE, correlated with cost
-            "volume": prov["volume"],         # OBSERVABLE provider size
-            "avg_hba1c": prov["avg_hba1c"],   # OBSERVABLE panel severity
+            "region": prov["city"],                          # context (not cost-driving)
+            "volume": prov["volume"],                        # OBSERVABLE feature
+            "avg_hba1c": prov["avg_hba1c"],                  # OBSERVABLE feature
+            "escalation_affinity": prov["escalation_affinity"],  # OBSERVABLE feature
             "patients": patient_ids,
         })
     return providers_public, thresholds
@@ -247,36 +285,46 @@ def make_cohort(seed: int, n_providers: int = DEFAULT_PROVIDERS_PER_TASK,
 
 def public_view(providers, unmedicated: set) -> list:
     """Provider list trimmed to currently-unmedicated patients, WITH the real
-    Synthea features the agent should reason over (region, volume, avg HbA1c)."""
+    Synthea features the agent should reason over. ``thresholds`` (k) never
+    appear here -- they are hidden and live only in the grader."""
     return [
         {"id": p["id"], "region": p["region"], "volume": p["volume"],
          "avg_hba1c": p["avg_hba1c"],
+         "escalation_affinity": p["escalation_affinity"],
          "patients": [q for q in p["patients"] if q in unmedicated]}
         for p in providers
     ]
 
 
 # --------------------------------------------------------------------------- #
-# Standalone summary: `python synthea_cohort.py`
+# Standalone summary: `python synthea_cohort.py [dump]`
 # --------------------------------------------------------------------------- #
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "dump":
         dump_cache()
-        _POOL = None  # force reload from the freshly written cache below
+        _POOL = None
         print(f"Wrote {CACHE_JSON.name} from {SYNTHEA_CSV_DIR}\n")
     pool = _pool()
     n_pat = sum(len(p["patients"]) for p in pool)
+    thr = [t for p in pool for t in p["thresholds"].values()]
     print(f"CSV dir: {SYNTHEA_CSV_DIR}")
     print(f"Providers with undertreated T2D panel: {len(pool)}")
     print(f"Total undertreated (T2D + HbA1c>={UNCONTROLLED_HBA1C}) patients: {n_pat}")
-    cities = Counter(p["city"] for p in pool)
-    print(f"Distinct cities (regions): {len(cities)}  top: {cities.most_common(5)}")
-    thr = [t for p in pool for t in p["thresholds"].values()]
-    print(f"Hidden $-to-convert: min={min(thr):.0f} "
+    print(f"Hidden $-to-convert (k): min={min(thr):.0f} "
           f"median={sorted(thr)[len(thr)//2]:.0f} max={max(thr):.0f}")
+
+    # variance decomposition: confirm the residual really is dominant
+    zf = {f: _zscore([p[f] for p in pool]) for f in BETA}
+    feat_contrib = [-sum(BETA[f] * zf[f](p[f]) for f in BETA) for p in pool]
+    resid = [math.log(_provider_resid(p["uuid"])) for p in pool]
+    print(f"\nlog(k) variance: feature-prior std={st.pstdev(feat_contrib):.2f}  "
+          f"residual std={st.pstdev(resid):.2f}  "
+          f"-> residual {'DOMINANT' if st.pstdev(resid) > st.pstdev(feat_contrib) else 'NOT dominant'}")
+
     print("\n--- example task (seed=0) ---")
     provs, thresholds = make_cohort(0)
     for p in provs:
-        print(f"  prov {p['id']}: region={p['region']!r} vol={p['volume']} "
-              f"avgHbA1c={p['avg_hba1c']} panel={len(p['patients'])}")
+        print(f"  prov {p['id']}: vol={p['volume']:>6} "
+              f"avgHbA1c={p['avg_hba1c']} affinity={p['escalation_affinity']} "
+              f"panel={len(p['patients'])}")
     print(f"  total patients in task: {len(thresholds)}")
