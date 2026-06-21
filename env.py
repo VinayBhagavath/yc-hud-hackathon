@@ -31,23 +31,23 @@ from synthea_cohort import make_cohort, public_view
 env = Environment(name="provider-allocation", version="0.0.1")
 
 
-def parse_plan(answer, rounds: int) -> dict[int, dict]:
-    """Pull a {round: {provider_id: amount}} plan out of the agent's text answer.
+def _balanced_objects(s: str) -> list[str]:
+    """Return every top-level {...} balanced substring, in order of appearance."""
+    objs, depth, start = [], 0, None
+    for i, ch in enumerate(s):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}" and depth > 0:
+            depth -= 1
+            if depth == 0 and start is not None:
+                objs.append(s[start:i + 1])
+                start = None
+    return objs
 
-    Tolerant of markdown fences / surrounding prose: grabs the outermost JSON
-    object. Accepts either {"round1": {...}, ...} or {"1": {...}, ...}. Returns
-    {round_index: {provider_id: amount}} for 0..rounds-1; missing rounds -> {}.
-    """
-    if not isinstance(answer, str):
-        return {}
-    m = re.search(r"\{.*\}", answer, re.DOTALL)
-    if not m:
-        return {}
-    try:
-        raw = json.loads(m.group(0))
-    except (ValueError, TypeError):
-        return {}
 
+def _coerce_plan(raw, rounds: int) -> dict[int, dict]:
     plan: dict[int, dict] = {}
     for key, alloc in (raw.items() if isinstance(raw, dict) else []):
         digits = re.search(r"\d+", str(key))
@@ -64,6 +64,27 @@ def parse_plan(answer, rounds: int) -> dict[int, dict]:
                     continue
             plan[r] = out
     return plan
+
+
+def parse_plan(answer, rounds: int) -> dict[int, dict]:
+    """Pull a {round: {provider_id: amount}} plan out of the agent's text answer.
+
+    Models (esp. small ones) ramble and echo the example before the real plan,
+    so we scan ALL balanced {...} objects and take the LAST one that parses to a
+    valid plan -- skipping prose and the example (which often contains a literal
+    ``...`` that fails json.loads).
+    """
+    if not isinstance(answer, str):
+        return {}
+    for cand in reversed(_balanced_objects(answer)):
+        try:
+            raw = json.loads(cand)
+        except (ValueError, TypeError):
+            continue
+        plan = _coerce_plan(raw, rounds)
+        if plan:
+            return plan
+    return {}
 
 
 @env.template()
@@ -84,9 +105,10 @@ async def allocate(seed: int = 0, budget: float = 1500.0, rounds: int = 3):
         f"cost-to-convert (NOT shown; it correlates with region). Converted patients stay "
         f"on therapy and are removed from later rounds. Plan all {rounds} rounds up front, "
         f"spending each round's budget where it converts the most patients.\n\n"
-        f"Respond with ONLY a JSON object mapping each round to provider funding, e.g.:\n"
-        f'{{"round1": {{"0": 800, "3": 700}}, "round2": {{"1": 1500}}, "round3": {{"2": 900}}}}\n'
-        f"Each round's total must be <= ${budget:.0f}."
+        f"Output ONLY a single JSON object and nothing else -- no reasoning, no explanation, "
+        f"no markdown. Your response must START with '{{' and map each round to provider "
+        f"funding (each round's total <= ${budget:.0f}). Exact format:\n"
+        f'{{"round1": {{"0": 800, "3": 700}}, "round2": {{"1": 1500}}, "round3": {{"2": 900}}}}'
     )
 
     plan = parse_plan(answer, rounds)

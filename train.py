@@ -45,7 +45,7 @@ for _noisy in ("httpx", "httpcore", "openai", "asyncssh", "websockets", "urllib3
 # Set SMOKE_TEST=1 for a tiny, cheap run (also shrinks the taskset in tasks.py).
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
-MODEL = "payout-rl"
+MODEL = "payout-rl-q4b"
 GROUP_SIZE = 4 if SMOKE_TEST else 8
 ITERATIONS = 2 if SMOKE_TEST else 20
 LEARNING_RATE = 1e-5
@@ -64,6 +64,7 @@ async def main() -> None:
         MODEL,
         completion_kwargs={
             "temperature": TEMPERATURE,
+            "max_tokens": 1024,           # room to finish the JSON (it rambled+truncated before)
             "extra_body": {"return_token_ids": True},
         },
     )
