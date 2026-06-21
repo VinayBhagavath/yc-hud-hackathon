@@ -15,13 +15,12 @@ from env import allocate
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 if SMOKE_TEST:
-    SEEDS = range(6)              # 6 tasks x group 4 = 24 rollouts/iter (gentle on Tinker)
-    BUDGETS = (1500.0,)           # tight -> max learning headroom (naive 0.16, ceiling 0.75)
+    SEEDS = range(6)              # 6 tasks x group 4 = 24 rollouts/iter
+    BUDGETS = (2500.0,)           # single-round sweet spot: even 0.29, smart ceiling 0.66
 else:
-    # Tinker is healthy now: 12 tasks x group 8 = 96 rollouts/iter for steadier
-    # gradients and better generalization across cohorts.
+    # 12 tasks x group 8 = 96 rollouts/iter for steadier gradients + generalization.
     SEEDS = range(12)
-    BUDGETS = (1500.0,)
+    BUDGETS = (2500.0,)
 
 # Expose exactly ONE taskset. Exposing both a loose list and a Taskset makes
 # HUD's module loader discover the same tasks twice -> "duplicate task slugs".

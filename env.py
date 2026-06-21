@@ -1,21 +1,17 @@
-"""HUD environment: fund providers to maximize patient medication uptake.
+"""HUD environment: prioritize providers to maximize patient medication uptake.
 
-Trainable models (e.g. a forked Qwen) run under HUD's openai_compatible agent
-harness, which has NO bash/shell tool -- only filesystem + MCP. So this env is
-*tool-free*: the provider data is embedded in the prompt and the agent answers
-with its full multi-round funding plan as JSON text. That works with every model
-harness (Claude, Qwen, ...) and keeps the hidden cost-to-convert entirely
-server-side (no leak).
+ACTION = a PRIORITY RANKING of providers (not dollar amounts). Models are bad at
+budgeting dollars (they collapse to funding one provider), but good at ranking.
+So the agent outputs an ordered list of provider ids; the ENV does the money:
+it funds each provider in order just enough to put all its untreated patients on
+therapy, until the one-time budget runs out. The agent's only job is to rank
+providers by cost-effectiveness -- the real learnable skill (cost correlates with
+region, which is observable).
 
-Decision: fund providers (not patients). A patient converts when the funding to
-their provider, split evenly across that provider's still-untreated patients,
-meets that patient's hidden cost-to-convert. Converted patients are removed from
-later rounds (sticky); the budget refreshes each round.
+Tool-free, single decision. Reward = patients converted / total.
 
-  reward = total patients converted across all rounds / initial count   in [0, 1]
-
-Reward source: Synthea diabetes cohort via synthea_cohort.make_cohort; the
-cost-to-convert rule is dynamics.run_round.
+Reward source: Synthea diabetes cohort (synthea_cohort.make_cohort) + the
+cost-to-convert rule (dynamics.run_round).
 """
 
 from __future__ import annotations
@@ -31,102 +27,75 @@ from synthea_cohort import make_cohort, public_view
 env = Environment(name="provider-allocation", version="0.0.1")
 
 
-def _balanced_objects(s: str) -> list[str]:
-    """Return every top-level {...} balanced substring, in order of appearance."""
-    objs, depth, start = [], 0, None
-    for i, ch in enumerate(s):
-        if ch == "{":
-            if depth == 0:
-                start = i
-            depth += 1
-        elif ch == "}" and depth > 0:
-            depth -= 1
-            if depth == 0 and start is not None:
-                objs.append(s[start:i + 1])
-                start = None
-    return objs
+def parse_ranking(answer) -> list[int]:
+    """Extract an ordered list of provider ids from the agent's answer.
 
-
-def _coerce_plan(raw, rounds: int) -> dict[int, dict]:
-    plan: dict[int, dict] = {}
-    for key, alloc in (raw.items() if isinstance(raw, dict) else []):
-        digits = re.search(r"\d+", str(key))
-        if not digits or not isinstance(alloc, dict):
-            continue
-        r = int(digits.group(0))
-        r = r - 1 if r >= 1 else r          # "round1"/"1" -> index 0
-        if 0 <= r < rounds:
-            out = {}
-            for pid, amt in alloc.items():
-                try:
-                    out[int(pid)] = max(0.0, float(amt))
-                except (ValueError, TypeError):
-                    continue
-            plan[r] = out
-    return plan
-
-
-def parse_plan(answer, rounds: int) -> dict[int, dict]:
-    """Pull a {round: {provider_id: amount}} plan out of the agent's text answer.
-
-    Models (esp. small ones) ramble and echo the example before the real plan,
-    so we scan ALL balanced {...} objects and take the LAST one that parses to a
-    valid plan -- skipping prose and the example (which often contains a literal
-    ``...`` that fails json.loads).
+    Takes the LAST JSON array of integers in the text (skips prose / examples).
     """
     if not isinstance(answer, str):
-        return {}
-    for cand in reversed(_balanced_objects(answer)):
+        return []
+    for cand in reversed(re.findall(r"\[[^\[\]]*\]", answer)):
         try:
-            raw = json.loads(cand)
+            arr = json.loads(cand)
         except (ValueError, TypeError):
             continue
-        plan = _coerce_plan(raw, rounds)
-        if plan:
-            return plan
-    return {}
+        ids = []
+        for x in arr:
+            try:
+                ids.append(int(x))
+            except (ValueError, TypeError):
+                pass
+        if ids:
+            return ids
+    return []
+
+
+def ranking_to_alloc(providers, thresholds, ranking, budget) -> dict[int, float]:
+    """Fund providers in priority order, each just enough to clear ALL its
+    untreated patients, until the budget runs out. Returns {provider_id: dollars}.
+    """
+    prov = {p["id"]: p for p in providers}
+    unmed = set(thresholds)
+    alloc, spent, seen = {}, 0.0, set()
+    for pid in ranking:
+        p = prov.get(pid)
+        if p is None or pid in seen:
+            continue
+        seen.add(pid)
+        active = [q for q in p["patients"] if q in unmed]
+        if not active:
+            continue
+        need = max(thresholds[q] for q in active) * len(active)  # share=max_thr -> clears all
+        if spent + need <= budget:
+            alloc[pid] = need
+            spent += need
+            unmed -= set(active)
+    return alloc
 
 
 @env.template()
-async def allocate(seed: int = 0, budget: float = 1500.0, rounds: int = 3):
+async def allocate(seed: int = 0, budget: float = 2500.0):
     providers, thresholds = make_cohort(seed)
     n_total = len(thresholds)
-    view = public_view(providers, set(thresholds))   # features only, NO costs
+    view = public_view(providers, set(thresholds))
 
     answer = yield (
-        f"You direct a patient-access program for a branded GLP-1 diabetes therapy. "
-        f"Allocate ${budget:.0f} of outreach funding across healthcare providers in EACH "
-        f"of {rounds} rounds (the budget refreshes every round) to get as many "
-        f"undertreated Type 2 Diabetes patients onto therapy as possible.\n\n"
-        f"Providers (JSON) -- each has a `region` (city), `volume`, `avg_hba1c`, and the "
-        f"ids of patients still untreated:\n{json.dumps(view)}\n\n"
-        f"A patient converts when the funding you give their provider, split evenly across "
-        f"that provider's still-untreated patients, meets that patient's hidden "
-        f"cost-to-convert (NOT shown; it correlates with region). Converted patients stay "
-        f"on therapy and are removed from later rounds.\n\n"
-        f"Key math: a patient's share = (funding to their provider) / (that provider's "
-        f"untreated-patient count), and they convert only if share >= their cost. So "
-        f"over-funding one provider wastes money, but spreading so thin that nobody's share "
-        f"clears their cost converts no one. Sweet spot: pick a FEW cost-effective providers "
-        f"each round and give each just enough to clear its patients. Plan all {rounds} rounds "
-        f"up front to maximize total conversions.\n\n"
-        f"Output ONLY a single JSON object and nothing else -- no reasoning, no explanation, "
-        f"no markdown, starting with '{{'. Use the ACTUAL provider ids from the data above "
-        f"and dollar amounts YOU choose; each round's total must be <= ${budget:.0f}. Shape "
-        f"(placeholders -- fill in real ids/amounts, do not copy):\n"
-        f'{{"round1": {{"<provider_id>": <dollars>, ...}}, "round2": {{...}}, "round3": {{...}}}}\n'
-        f"/no_think"   # Qwen switch: answer directly instead of emitting a <think> ramble
+        f"You direct a patient-access program for a branded GLP-1 diabetes therapy with a "
+        f"one-time outreach budget of ${budget:.0f}. Goal: put as many undertreated Type 2 "
+        f"Diabetes patients on therapy as possible.\n\n"
+        f"Providers (JSON) -- each has a `region` (city), `volume`, `avg_hba1c`, and the ids "
+        f"of untreated patients:\n{json.dumps(view)}\n\n"
+        f"Each patient has a HIDDEN cost-to-convert that correlates with their provider's "
+        f"region. You do NOT set dollar amounts. Instead, RANK the providers from most to "
+        f"least cost-effective. We will fund them in your order -- each one just enough to "
+        f"convert all its patients -- until the ${budget:.0f} runs out. So put the providers "
+        f"whose patients are cheapest to convert (and who serve more patients per dollar) "
+        f"first.\n\n"
+        f"Output ONLY a JSON array of provider ids in priority order, nothing else, e.g. "
+        f"[3, 7, 1, 4].\n/no_think"
     )
 
-    plan = parse_plan(answer, rounds)
-    unmedicated = set(thresholds)
-    medicated = 0
-    for r in range(rounds):
-        alloc = plan.get(r, {})
-        if sum(alloc.values()) > budget:        # over budget -> wasted round
-            continue
-        newly = run_round(providers, unmedicated, thresholds, alloc)
-        unmedicated -= newly
-        medicated += len(newly)
-
-    yield medicated / n_total if n_total else 0.0
+    ranking = parse_ranking(answer)
+    alloc = ranking_to_alloc(providers, thresholds, ranking, budget)
+    newly = run_round(providers, set(thresholds), thresholds, alloc)
+    yield len(newly) / n_total if n_total else 0.0
