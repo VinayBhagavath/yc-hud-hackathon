@@ -18,9 +18,9 @@ if SMOKE_TEST:
     SEEDS = range(6)              # 6 tasks x group 4 = 24 rollouts/iter (gentle on Tinker)
     BUDGETS = (1500.0,)           # tight -> max learning headroom (naive 0.16, ceiling 0.75)
 else:
-    # Sized for the slow/flaky Tinker backend: 8 tasks x group 6 = 48 rollouts/iter.
-    # Enough within-group variance for GRPO and few enough to finish a real run.
-    SEEDS = range(8)
+    # Tinker is healthy now: 12 tasks x group 8 = 96 rollouts/iter for steadier
+    # gradients and better generalization across cohorts.
+    SEEDS = range(12)
     BUDGETS = (1500.0,)
 
 # Expose exactly ONE taskset. Exposing both a loose list and a Taskset makes
