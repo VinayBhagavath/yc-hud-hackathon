@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { useDashboard } from "@/lib/useDashboard";
 import { useReplay } from "@/lib/replay";
 import type { DashboardPayload } from "@/lib/types";
@@ -8,6 +9,7 @@ import { API_BASE } from "@/lib/api";
 import { PALETTE } from "@/lib/palette";
 import UsMap, { type BaseRegion } from "@/components/UsMap";
 import AgentGraph from "@/components/AgentGraph";
+import LineageIntro from "@/components/intro/LineageIntro";
 import KpiBar from "@/components/KpiBar";
 import RegionBreakdown from "@/components/RegionBreakdown";
 import PersonFeed from "@/components/PersonFeed";
@@ -31,12 +33,51 @@ export default function Page() {
       />
     );
   }
-  return <Dashboard data={load.data} />;
+  return <Experience data={load.data} />;
+}
+
+// Orchestrates the cold-open → live-room hand-off. The atomic swap between
+// <LineageIntro> and <Dashboard> is what drives the shared layoutId="agent-core"
+// morph; the live replay autoplays the moment the dashboard mounts.
+function Experience({ data }: { data: DashboardPayload }) {
+  const [decided, setDecided] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
+  const [canReplayIntro, setCanReplayIntro] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const force = params.get("intro") === "1";
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const seen = sessionStorage.getItem("seenIntro");
+    setShowIntro(force || (!reduced && !seen));
+    setCanReplayIntro(!reduced);
+    setDecided(true);
+  }, []);
+
+  const finishIntro = () => {
+    sessionStorage.setItem("seenIntro", "1");
+    setShowIntro(false);
+  };
+
+  if (!decided) return <main className="min-h-screen" />;
+  if (showIntro) return <LineageIntro data={data} onDone={finishIntro} />;
+  return (
+    <Dashboard
+      data={data}
+      onReplayIntro={canReplayIntro ? () => setShowIntro(true) : undefined}
+    />
+  );
 }
 
 type CenterView = "map" | "graph";
 
-function Dashboard({ data }: { data: DashboardPayload }) {
+function Dashboard({
+  data,
+  onReplayIntro,
+}: {
+  data: DashboardPayload;
+  onReplayIntro?: () => void;
+}) {
   const replay = useReplay(data);
   const { state } = replay;
   const [view, setView] = useState<CenterView>("map");
@@ -60,8 +101,16 @@ function Dashboard({ data }: { data: DashboardPayload }) {
   }, [data]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[1680px] flex-col gap-4 p-4 lg:p-6">
-      <Header total={data.overview.total_patients} undermedicated={data.overview.undermedicated} />
+    <motion.main
+      className="mx-auto flex min-h-screen max-w-[1680px] flex-col gap-4 p-4 lg:p-6"
+      initial={{ opacity: 0, scale: 1.03 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.7, ease: "easeOut" }}
+    >
+      <Header
+        undermedicated={data.overview.undermedicated}
+        onReplayIntro={onReplayIntro}
+      />
 
       {/* Hero scoreboard. */}
       <KpiBar state={state} evals={data.eval_summaries} />
@@ -104,11 +153,17 @@ function Dashboard({ data }: { data: DashboardPayload }) {
         <PolicyComparison evals={data.eval_summaries} />
         <TrainingCurve curve={data.training_curve} progress={state.progress} />
       </div>
-    </main>
+    </motion.main>
   );
 }
 
-function Header({ total, undermedicated }: { total: number; undermedicated: number }) {
+function Header({
+  undermedicated,
+  onReplayIntro,
+}: {
+  undermedicated: number;
+  onReplayIntro?: () => void;
+}) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3">
@@ -128,13 +183,23 @@ function Header({ total, undermedicated }: { total: number; undermedicated: numb
           </p>
         </div>
       </div>
-      <span className="flex items-center gap-2 rounded-full border border-hairline bg-canvas-2 px-3 py-1.5 text-xs text-muted">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald opacity-75 motion-reduce:hidden" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald" />
+      <div className="flex items-center gap-2">
+        {onReplayIntro && (
+          <button
+            onClick={onReplayIntro}
+            className="rounded-full border border-hairline bg-canvas-2 px-3 py-1.5 text-xs text-muted transition hover:text-ink"
+          >
+            ↺ Replay intro
+          </button>
+        )}
+        <span className="flex items-center gap-2 rounded-full border border-hairline bg-canvas-2 px-3 py-1.5 text-xs text-muted">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald opacity-75 motion-reduce:hidden" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald" />
+          </span>
+          Replaying production rounds
         </span>
-        Replaying production rounds
-      </span>
+      </div>
     </header>
   );
 }
