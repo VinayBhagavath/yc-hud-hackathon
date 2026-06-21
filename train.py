@@ -28,7 +28,7 @@ against the HUD docs skill before a long run.
 import asyncio
 import os
 
-from hud import Job, TrainingClient, HUDRuntime  # , LocalRuntime
+from hud import Job, TrainingClient, LocalRuntime  # , HUDRuntime
 from hud.agents import create_agent
 
 import tasks
@@ -40,6 +40,10 @@ MODEL = "payout-rl"
 GROUP_SIZE = 4 if SMOKE_TEST else 8
 ITERATIONS = 2 if SMOKE_TEST else 20
 LEARNING_RATE = 1e-5
+# Cap concurrent rollouts -- unbounded gather opens too many sockets/processes
+# and hits the OS file-descriptor limit (Errno 24: Too many open files).
+MAX_CONCURRENT = 4
+ROLLOUT_TIMEOUT = 300.0  # per-rollout wall-clock cap (s) so one stuck rollout can't wedge the batch
 
 # Sampling temperature is REQUIRED for GRPO: rollouts in a group must differ, or
 # advantage (reward - group_mean) is ~0 and nothing is learned. Keep it > 0.
@@ -56,15 +60,19 @@ async def main() -> None:
     )
     trainer = TrainingClient(MODEL)
 
-    # Cloud rollouts on HUD infra (this is the "train through HUD" path).
-    # Requires `hud deploy` first. For local iteration instead, use:
-    #   runtime = LocalRuntime("env.py")
-    runtime = HUDRuntime()
+    # Rollouts serve the env LOCALLY (same path as `hud eval`); the model is
+    # still sampled through the HUD gateway and weight updates run on HUD via
+    # TrainingClient. Swap to HUDRuntime() to run the env on HUD infra too
+    # (needs `hud deploy` first).
+    runtime = LocalRuntime("env.py")
 
     session = await Job.start(MODEL, group=GROUP_SIZE)
     for it in range(ITERATIONS):
         start = len(session.runs)
-        await tasks.taskset.run(agent, runtime=runtime, job=session)
+        await tasks.taskset.run(
+            agent, runtime=runtime, job=session,
+            max_concurrent=MAX_CONCURRENT, rollout_timeout=ROLLOUT_TIMEOUT,
+        )
         batch = session.runs[start:]
         metrics = await trainer.step(
             batch, learning_rate=LEARNING_RATE, group_size=GROUP_SIZE
