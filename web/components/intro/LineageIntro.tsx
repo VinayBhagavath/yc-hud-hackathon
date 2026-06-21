@@ -6,10 +6,10 @@ import type { DashboardPayload } from "@/lib/types";
 import { PALETTE } from "@/lib/palette";
 import { num, usd } from "@/lib/format";
 
-// Stage coordinate system (a 1000×600 SVG, scaled responsively).
+// Stage coordinate system (a 1000×480 SVG, scaled responsively).
 const SW = 1000;
-const SH = 560;
-const AGENT = { x: 500, y: 280 };
+const SH = 480;
+const AGENT = { x: 500, y: 240 };
 
 // A gentle curve between two stage points, bowed slightly upward.
 function curve(ax: number, ay: number, bx: number, by: number): string {
@@ -83,9 +83,9 @@ export default function LineageIntro({
   const patients = useMemo(() => {
     const n = 18;
     return Array.from({ length: n }, (_, i) => {
-      const col = i % 4;
-      const row = Math.floor(i / 4);
-      return { x: 96 + col * 24, y: 188 + row * 26, key: i };
+      const col = i % 3;
+      const row = Math.floor(i / 3);
+      return { x: 72 + col * 30, y: 70 + row * 56, key: i };
     });
   }, []);
 
@@ -96,15 +96,15 @@ export default function LineageIntro({
       if (seen.size >= 3) break;
     }
     const list = [...seen.values()];
-    const ys = [200, 280, 360];
-    return list.map((p, i) => ({ ...p, x: 322, y: ys[i] ?? 280, key: i }));
+    const ys = [100, 240, 380];
+    return list.map((p, i) => ({ ...p, x: 320, y: ys[i] ?? 240, key: i }));
   }, [data.physicians]);
 
   const sponsors = useMemo(
     () => [
-      { label: "Sponsor A", x: 868, y: 205 },
-      { label: "Sponsor B", x: 884, y: 280 },
-      { label: "Sponsor C", x: 868, y: 355 },
+      { label: "Sponsor A", x: 866, y: 105 },
+      { label: "Sponsor B", x: 882, y: 240 },
+      { label: "Sponsor C", x: 866, y: 375 },
     ],
     [],
   );
