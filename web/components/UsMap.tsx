@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import statesTopo from "us-atlas/states-10m.json";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { ReplayState } from "@/lib/replay";
 import { MAP_HEIGHT, MAP_WIDTH, project, projection, TREASURY } from "@/lib/projection";
 import { usd } from "@/lib/format";
@@ -46,6 +46,7 @@ export default function UsMap({
   baseRegions: BaseRegion[];
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
+  const reduced = useReducedMotion();
 
   const newestFlow = state.flows.length > 0 ? state.flows[state.flows.length - 1] : null;
   const activeRegion = newestFlow?.region ?? null;
@@ -150,15 +151,17 @@ export default function UsMap({
             can share a layoutId with the cold-open. Here we just draw the faint
             seat the arcs fan out from. */}
         <g transform={`translate(${TREASURY.x} ${TREASURY.y})`}>
-          <motion.circle
-            r={10}
-            fill="none"
-            stroke={PALETTE.gold}
-            strokeWidth={1.2}
-            initial={{ r: 10, opacity: 0.45 }}
-            animate={{ r: 30, opacity: 0 }}
-            transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
-          />
+          {!reduced && (
+            <motion.circle
+              r={10}
+              fill="none"
+              stroke={PALETTE.gold}
+              strokeWidth={1.2}
+              initial={{ r: 10, opacity: 0.45 }}
+              animate={{ r: 30, opacity: 0 }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
+            />
+          )}
           <text
             y={30}
             textAnchor="middle"
@@ -194,10 +197,13 @@ export default function UsMap({
       <motion.div
         layoutId="agent-core"
         className="pointer-events-none absolute flex h-7 w-7 items-center justify-center rounded-full bg-gold text-canvas shadow-gold"
+        // Centre with negative margins, not transform — framer-motion drives the
+        // layout transform during the morph and would clobber a CSS translate.
         style={{
           left: `${(TREASURY.x / MAP_WIDTH) * 100}%`,
           top: `${(TREASURY.y / MAP_HEIGHT) * 100}%`,
-          transform: "translate(-50%, -50%)",
+          marginLeft: -14,
+          marginTop: -14,
         }}
         transition={{ type: "spring", stiffness: 120, damping: 18 }}
       >

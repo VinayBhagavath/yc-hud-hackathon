@@ -271,10 +271,13 @@ export default function LineageIntro({
             <motion.div
               layoutId="agent-core"
               className="pointer-events-none absolute flex h-14 w-14 items-center justify-center rounded-full bg-gold text-canvas shadow-gold"
+              // Centre via negative margins (see UsMap) so the layoutId morph
+              // isn't fighting a CSS translate.
               style={{
                 left: `${(AGENT.x / SW) * 100}%`,
                 top: `${(AGENT.y / SH) * 100}%`,
-                transform: "translate(-50%, -50%)",
+                marginLeft: -28,
+                marginTop: -28,
               }}
               transition={{ type: "spring", stiffness: 120, damping: 18 }}
             >

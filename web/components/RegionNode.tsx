@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { PALETTE } from "@/lib/palette";
 
 export interface RegionNodeProps {
@@ -24,6 +24,7 @@ export default function RegionNode({
   onEnter,
   onLeave,
 }: RegionNodeProps) {
+  const reduced = useReducedMotion();
   return (
     <g
       transform={`translate(${x} ${y})`}
@@ -31,7 +32,7 @@ export default function RegionNode({
       onMouseLeave={onLeave}
       style={{ cursor: "pointer" }}
     >
-      {active && (
+      {active && !reduced && (
         <motion.circle
           r={radius}
           fill="none"

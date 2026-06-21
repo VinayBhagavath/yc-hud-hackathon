@@ -85,10 +85,12 @@ export default function KpiBar({
           liveCost === null ? "—" : <CountUp value={liveCost} format={(n) => usd(n)} />
         }
         caption={
-          vsGreedy != null ? (
+          vsGreedy == null ? (
+            "agent's price to medicate one patient"
+          ) : vsGreedy > 0 ? (
             <span className="text-emerald">▼ {vsGreedy}% cheaper than greedy</span>
           ) : (
-            "agent's price to medicate one patient"
+            <span className="text-muted">▲ {Math.abs(vsGreedy)}% vs greedy · settling</span>
           )
         }
       />

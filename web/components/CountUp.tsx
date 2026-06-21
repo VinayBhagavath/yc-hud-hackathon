@@ -1,17 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 
 // Smoothly tweens a displayed number toward `value` whenever it changes.
 export function useCountUp(value: number, duration = 500): number {
   const [display, setDisplay] = useState(value);
   const fromRef = useRef(value);
   const frame = useRef<number>();
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     const from = fromRef.current;
     const to = value;
     if (from === to) return;
+    // Reduced motion: snap straight to the value, no tween.
+    if (reduced) {
+      setDisplay(to);
+      fromRef.current = to;
+      return;
+    }
     const start = performance.now();
 
     const tick = (now: number) => {
@@ -31,7 +39,7 @@ export function useCountUp(value: number, duration = 500): number {
       if (frame.current) cancelAnimationFrame(frame.current);
       fromRef.current = value;
     };
-  }, [value, duration]);
+  }, [value, duration, reduced]);
 
   return display;
 }
