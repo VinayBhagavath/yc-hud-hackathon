@@ -173,9 +173,10 @@ async def allocate(seed: int = 0, budget: float = 3500.0):
         f"providers/patients are much cheaper than others). We fund providers in your ranked "
         f"order -- each just enough to convert all its patients -- until the ${budget:.0f} "
         f"runs out, so rank the most cost-effective providers first.\n\n"
-        f"Inspect what you need with the tools, then IMMEDIATELY call the submit_ranking tool "
-        f"with every provider id in priority order. Do NOT write a per-provider summary or a "
-        f"long analysis -- your final action must be the submit_ranking tool call itself."
+        f"Work FAST and decisively -- do NOT deliberate at length or reason step by step. Call "
+        f"get_providers once, optionally get_patients on just a FEW providers you're unsure "
+        f"about, then IMMEDIATELY call submit_ranking with every provider id in priority order. "
+        f"Keep any thinking to one short sentence; prefer speed over thoroughness."
     )
 
     # Prefer the tool submission; fall back to a ranking written in the final text.

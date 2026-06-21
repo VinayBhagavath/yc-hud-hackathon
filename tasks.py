@@ -15,7 +15,7 @@ from env import allocate
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 if SMOKE_TEST:
-    SEEDS = range(6)              # 6 tasks x group 4 = 24 rollouts/iter
+    SEEDS = range(4)              # 4 tasks x group 4 = 16 rollouts/iter (397B demo)
     BUDGETS = (3500.0,)           # scarce regime for ~50-patient tasks
 else:
     # 12 tasks x group 8 = 96 rollouts/iter; each task ~33 providers / ~100 patients.

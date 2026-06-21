@@ -46,13 +46,13 @@ for _noisy in ("httpx", "httpcore", "openai", "asyncssh", "websockets", "urllib3
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 MODEL = "payout-q397"   # largest trainable Qwen (397B A17B) -- reliably emits tool calls
-GROUP_SIZE = 4 if SMOKE_TEST else 8        # GRPO group: rollouts/task; bigger = steadier gradient
-ITERATIONS = 2 if SMOKE_TEST else 30       # on-policy steps -- the actual learning loop
+GROUP_SIZE = 4 if SMOKE_TEST else 8        # GRPO group: rollouts/task
+ITERATIONS = 5 if SMOKE_TEST else 30       # on-policy steps
 LEARNING_RATE = 1e-5
 # Tinker is healthy now, so parallelize harder. Still capped so we don't exhaust
 # local file descriptors or hammer the backend.
-MAX_CONCURRENT = 8
-ROLLOUT_TIMEOUT = 300.0  # per-rollout wall-clock cap (s) so one stuck rollout can't wedge the batch
+MAX_CONCURRENT = 4   # 397B is heavy
+ROLLOUT_TIMEOUT = 600.0  # 397B + tools is slow; let rollouts finish
 
 # Sampling temperature is REQUIRED for GRPO: rollouts in a group must differ, or
 # advantage (reward - group_mean) is ~0 and nothing is learned. Keep it > 0.
@@ -62,10 +62,10 @@ TEMPERATURE = 1.0
 async def main() -> None:
     agent = create_agent(
         MODEL,
-        max_steps=25,                     # tool loop: get_providers + many get_patients + submit
+        max_steps=14,                     # bound the tool loop (get_providers + a few get_patients + submit)
         completion_kwargs={
             "temperature": TEMPERATURE,
-            "max_tokens": 4096,           # brief thinking + tool calls
+            "max_tokens": 1200,           # short thinking + tool calls (speed)
             "extra_body": {"return_token_ids": True},
         },
     )
