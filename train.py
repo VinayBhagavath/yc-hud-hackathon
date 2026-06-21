@@ -37,6 +37,10 @@ import tasks
 # Surface HUD's INFO logs (e.g. "running N rollouts (... x group)") so the run
 # isn't silent while iteration 0 churns through rollouts before the first print.
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# ...but silence the per-HTTP-request flood from these libraries (one line per
+# rollout step otherwise) so the [train] progress lines stay readable.
+for _noisy in ("httpx", "httpcore", "openai", "asyncssh", "websockets", "urllib3"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 # Set SMOKE_TEST=1 for a tiny, cheap run (also shrinks the taskset in tasks.py).
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
