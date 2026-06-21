@@ -1,15 +1,19 @@
-"""Round driver the AGENT runs in its workspace shell: `python apply_round.py`.
+"""Round driver the AGENT runs in its workspace shell.
 
-Self-contained (stdlib only) so it runs from the workspace dir with no imports
-from the rest of the package. Reads the agent's alloc.json + the hidden .state.json,
-applies one round of the PLACEHOLDER medication rule (same rule as
-dynamics.run_round; Synthea replaces it later), removes medicated patients,
-refreshes the budget, and updates patients.json / results.json for the next round.
+Pass the allocation as a single JSON argument (preferred -- no file writing):
 
-The env template reads .state.json afterward to compute the episode reward.
+    python apply_round.py '{"<provider_id>": <amount>, ...}'
+
+(Falls back to reading alloc.json if no argument is given.)
+
+Self-contained (stdlib only). Applies one round of the medication rule (same as
+dynamics.run_round; Synthea data feeds it via env.py), removes medicated
+patients, refreshes the budget, and updates patients.json / results.json for the
+next round. The env template reads .state.json afterward to compute the reward.
 """
 
 import json
+import sys
 from pathlib import Path
 
 WS = Path(__file__).resolve().parent
@@ -23,12 +27,22 @@ def main() -> None:
               f"Final: {state['medicated']}/{state['n_total']} medicated.")
         return
 
+    # Allocation from CLI arg (preferred) or alloc.json (fallback).
+    if len(sys.argv) > 1:
+        alloc_src = sys.argv[1]
+    else:
+        try:
+            alloc_src = (WS / "alloc.json").read_text()
+        except FileNotFoundError:
+            print('Provide allocations: '
+                  'python apply_round.py \'{"<provider_id>": <amount>}\'')
+            return
     try:
-        raw = json.loads((WS / "alloc.json").read_text())
+        raw = json.loads(alloc_src)
         alloc = {int(k): max(0.0, float(v)) for k, v in raw.items()}
     except Exception as e:  # noqa: BLE001 -- surface the problem to the agent
-        print(f"Could not read alloc.json ({e}). Write it as "
-              '{"<provider_id>": <amount>} and rerun.')
+        print(f"Could not parse allocations ({e}). "
+              'Pass JSON like \'{"0": 1000, "1": 1500}\'.')
         return
 
     budget = state["budget"]

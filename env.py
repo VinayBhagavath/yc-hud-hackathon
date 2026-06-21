@@ -83,12 +83,13 @@ async def allocate(seed: int = 0, budget: float = 4000.0, rounds: int = 3):
         f"are removed from later rounds. Cost-to-convert is NOT shown, but it correlates "
         f"with region -- infer cost-effectiveness from the observable features and decide "
         f"from patients.json (no need to inspect other files).\n\n"
-        f"Each round:\n"
-        f"  1. read patients.json\n"
-        f'  2. write your funding to alloc.json as {{"<provider_id>": <amount>}}, '
-        f"total <= ${budget:.0f}\n"
-        f"  3. run `python apply_round.py`  (it reports results and refreshes patients.json)\n"
-        f"Repeat for all {rounds} rounds, then reply 'done'."
+        f"Use ONLY the bash tool. Each round:\n"
+        f"  1. read patients.json   (e.g. `cat patients.json`)\n"
+        f"  2. apply your funding by running, in one bash command:\n"
+        f"       python apply_round.py '{{\"<provider_id>\": <amount>, ...}}'\n"
+        f"     (total <= ${budget:.0f}; it reports results and refreshes patients.json)\n"
+        f"Do NOT use a file-editor tool and do not create files. Repeat for all "
+        f"{rounds} rounds, then reply 'done'."
     )
 
     try:
