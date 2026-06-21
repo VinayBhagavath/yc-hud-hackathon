@@ -24,7 +24,11 @@ from pathlib import Path
 
 from hud import Environment
 
-from dynamics import make_cohort
+# Real Synthea-backed cohort (Type 2 Diabetes / GLP-1). Same contract as
+# dynamics.make_cohort, so apply_round.py's rule is reused unchanged. To fall
+# back to the synthetic placeholder, swap this for `from dynamics import
+# make_cohort, public_view`.
+from synthea_cohort import make_cohort, public_view
 
 env = Environment(name="provider-allocation", version="0.0.1")
 
@@ -55,10 +59,10 @@ async def allocate(seed: int = 0, budget: float = 4000.0, rounds: int = 3):
     }
     (WORKSPACE / ".state.json").write_text(json.dumps(state))
 
-    # Public view: providers + region + remaining patient ids, NO cost info.
-    view = [{"id": p["id"], "region": p["region"], "patients": p["patients"]}
-            for p in providers]
-    (WORKSPACE / "patients.json").write_text(json.dumps(view, indent=2))
+    # Public view: real observable features (region/city, volume, avg HbA1c) +
+    # remaining patient ids. NO cost info -- the $-to-convert is hidden.
+    (WORKSPACE / "patients.json").write_text(
+        json.dumps(public_view(providers, set(thresholds)), indent=2))
 
     # Clear any stale files and drop the round driver in the workspace.
     for f in ("alloc.json", "results.json"):
@@ -66,14 +70,19 @@ async def allocate(seed: int = 0, budget: float = 4000.0, rounds: int = 3):
     shutil.copy(_APPLY_SRC, WORKSPACE / "apply_round.py")
 
     answer = yield (
-        f"You have a bash shell in your working directory and ${budget:.0f} to allocate "
-        f"across healthcare providers in EACH of {rounds} rounds (the budget refreshes "
-        f"every round). Goal: medicate as many patients as possible across all rounds.\n\n"
-        f"`patients.json` lists providers, each with a `region` and the ids of patients "
-        f"who still need medication. A patient becomes medicated when the funding you give "
-        f"their provider -- split evenly across that provider's listed patients -- is "
-        f"enough for them. Medicated patients stay medicated and are removed from later "
-        f"rounds. (Hint: cost-effectiveness correlates with region.)\n\n"
+        f"You direct a patient-access program for a branded GLP-1 diabetes therapy. "
+        f"You have a bash shell and ${budget:.0f} of outreach funding to allocate across "
+        f"healthcare providers in EACH of {rounds} rounds (the budget refreshes every "
+        f"round). Goal: get as many undertreated Type 2 Diabetes patients onto therapy "
+        f"('medicated') as possible across all rounds.\n\n"
+        f"`patients.json` lists providers, each with real observable features -- `region` "
+        f"(city), `volume` (provider patient volume), `avg_hba1c` (panel severity) -- and "
+        f"the ids of patients still untreated. A patient is converted when the funding you "
+        f"give their provider, split evenly across that provider's listed patients, meets "
+        f"that patient's (hidden) cost-to-convert. Converted patients stay on therapy and "
+        f"are removed from later rounds. Cost-to-convert is NOT shown, but it correlates "
+        f"with region -- infer cost-effectiveness from the observable features and decide "
+        f"from patients.json (no need to inspect other files).\n\n"
         f"Each round:\n"
         f"  1. read patients.json\n"
         f'  2. write your funding to alloc.json as {{"<provider_id>": <amount>}}, '

@@ -56,7 +56,9 @@ def main() -> None:
     state["reward"] = state["medicated"] / state["n_total"] if state["n_total"] else 0.0
     (WS / ".state.json").write_text(json.dumps(state))
 
-    view = [{"id": p["id"], "region": p["region"],
+    # Preserve all observable provider features (region, volume, avg_hba1c, ...),
+    # only trimming the patient list to those still untreated.
+    view = [{**{k: v for k, v in p.items() if k != "patients"},
              "patients": [q for q in p["patients"] if q in unmed]}
             for p in state["providers"]]
     (WS / "patients.json").write_text(json.dumps(view, indent=2))

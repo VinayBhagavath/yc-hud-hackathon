@@ -6,7 +6,7 @@
 # agent = "claude"
 # all = false  # Run all problems instead of just 1
 # max_concurrent = 30
-# max_steps = 10
+max_steps = 15           # cap shell turns -- the 3-round task needs ~9-12
 # group_size = 1
 # task_ids = ["checkout-smoke", "0"]  # slugs or 0-based indices
 # verbose = true
@@ -17,8 +17,8 @@
 # remote = false  # Run the whole rollout remotely on HUD
 
 [claude]
-# model = "claude-sonnet-4-6"
-# max_tokens = 16384
+model = "claude-sonnet-4-6"   # faster than Opus -> avoids the 60s upstream idle timeout
+max_tokens = 8192
 # use_computer_beta = true
 
 [openai]
