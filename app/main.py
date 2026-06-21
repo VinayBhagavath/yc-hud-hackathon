@@ -486,5 +486,16 @@ def get_dashboard() -> DashboardPayload:
     return repository().dashboard()
 
 
+@app.get("/api/model-allocation")
+def get_model_allocation() -> dict:
+    """The trained model's provider ranking + money allocation (from its real
+    submit_ranking output), shaped for the US map: `baseRegions` (geo) +
+    `byRegion` (spend/converted per region) + the ordered `ranking`."""
+    path = FIXTURE_DIR / "model_allocation.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="model_allocation fixture not found")
+    return json.loads(path.read_text())
+
+
 if STATIC_DIR.exists():
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

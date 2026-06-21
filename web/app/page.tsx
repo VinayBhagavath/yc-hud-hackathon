@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useDataSource, type DataSource } from "@/lib/useDataSource";
 import { useReplay } from "@/lib/replay";
+import type { ReplayState, RegionAgg } from "@/lib/replay";
 import type { DashboardPayload } from "@/lib/types";
 import { API_BASE } from "@/lib/api";
 import { PALETTE } from "@/lib/palette";
@@ -69,7 +70,27 @@ function Experience({ data, source }: { data: DashboardPayload; source: DataSour
   );
 }
 
-type CenterView = "map" | "graph";
+type CenterView = "map" | "graph" | "model";
+
+// Trained model's provider ranking + money allocation (GET /api/model-allocation).
+interface ModelAllocation {
+  model: string;
+  budget: number;
+  total_converted: number;
+  n_total: number;
+  total_spend: number;
+  ranking: {
+    rank: number;
+    provider_id: number;
+    region: string;
+    allocation_usd: number;
+    n_patients: number;
+    converted: number;
+    funded: boolean;
+  }[];
+  baseRegions: { region: string; lat: number; lon: number }[];
+  byRegion: { region: string; funded: number; medicated: number; spend: number }[];
+}
 
 function Dashboard({
   data,
@@ -83,6 +104,46 @@ function Dashboard({
   const replay = useReplay(data);
   const { state } = replay;
   const [view, setView] = useState<CenterView>("map");
+
+  // Trained model's allocation, fetched once from the backend.
+  const [modelAlloc, setModelAlloc] = useState<ModelAllocation | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`${API_BASE}/api/model-allocation`, { signal: ctrl.signal, cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<ModelAllocation>) : null))
+      .then((d) => setModelAlloc(d))
+      .catch(() => undefined);
+    return () => ctrl.abort();
+  }, []);
+
+  const modelBaseRegions = useMemo<BaseRegion[]>(() => {
+    if (!modelAlloc) return [];
+    const panel = new Map(modelAlloc.ranking.map((r) => [r.region, r.n_patients]));
+    return modelAlloc.baseRegions.map((b) => ({
+      region: b.region, city: b.region, lat: b.lat, lon: b.lon, panel: panel.get(b.region) ?? 0,
+    }));
+  }, [modelAlloc]);
+
+  const modelState = useMemo<ReplayState | null>(() => {
+    if (!modelAlloc) return null;
+    const geo = new Map(modelAlloc.baseRegions.map((b) => [b.region, b]));
+    const panel = new Map(modelAlloc.ranking.map((r) => [r.region, r.n_patients]));
+    const byRegion: RegionAgg[] = modelAlloc.byRegion.map((r) => ({
+      region: r.region, city: r.region,
+      lat: geo.get(r.region)?.lat ?? 0, lon: geo.get(r.region)?.lon ?? 0,
+      spend: r.spend, funded: r.funded, medicated: r.medicated,
+      people: r.funded, panel: panel.get(r.region) ?? 0,
+    }));
+    return {
+      roundIndex: 0, roundId: "model", totalRounds: 1, budgetTotal: modelAlloc.budget,
+      spend: modelAlloc.total_spend, fundedCount: modelAlloc.total_converted,
+      peopleReached: modelAlloc.total_converted, medicatedCount: modelAlloc.total_converted,
+      organicCount: 0,
+      costPerMedicated: modelAlloc.total_converted ? modelAlloc.total_spend / modelAlloc.total_converted : null,
+      conversionRate: 1, byRegion, flows: [], persons: [], toolLog: [],
+      latestKind: "start", progress: 1,
+    };
+  }, [modelAlloc]);
 
   const baseRegions = useMemo<BaseRegion[]>(() => {
     const panelByRegion = new Map(data.overview.region_buckets.map((r) => [r.label, r.patient_count]));
@@ -133,11 +194,19 @@ function Dashboard({
           <div className="panel relative flex min-h-[460px] flex-1 flex-col p-3 sm:p-5">
             <div className="mb-1 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <span className="placard">{view === "map" ? "Live allocation map" : "Agent decision graph"}</span>
+                <span className="placard">
+                  {view === "map"
+                    ? "Live allocation map"
+                    : view === "graph"
+                      ? "Agent decision graph"
+                      : "Trained model allocation"}
+                </span>
                 <p className="mt-1.5 text-[11px] text-faint">
                   {view === "map"
                     ? "Agent → physician metro · arc width ∝ dollars · node grows with spend"
-                    : "Agent → physicians → patients · edge ∝ dollars · colour ∝ outcome"}
+                    : view === "graph"
+                      ? "Agent → physicians → patients · edge ∝ dollars · colour ∝ outcome"
+                      : "Trained model's provider ranking · node grows with $ allocated · green = funded"}
                 </p>
               </div>
               <ViewToggle view={view} onChange={setView} />
@@ -145,8 +214,12 @@ function Dashboard({
             <div className="relative flex min-h-0 flex-1 items-center overflow-hidden">
               {view === "map" ? (
                 <UsMap state={state} baseRegions={baseRegions} />
-              ) : (
+              ) : view === "graph" ? (
                 <AgentGraph state={state} physicians={graphPhysicians} />
+              ) : modelState ? (
+                <ModelMap state={modelState} baseRegions={modelBaseRegions} ranking={modelAlloc!.ranking} />
+              ) : (
+                <div className="m-auto text-[12px] text-faint">Loading model allocation… (is the API running?)</div>
               )}
             </div>
             <Legend />
@@ -239,10 +312,48 @@ function SourceChip({ source }: { source: DataSource }) {
   );
 }
 
+// The trained model's allocation on the same US map, plus a ranking overlay.
+function ModelMap({
+  state,
+  baseRegions,
+  ranking,
+}: {
+  state: ReplayState;
+  baseRegions: BaseRegion[];
+  ranking: ModelAllocation["ranking"];
+}) {
+  return (
+    <div className="relative h-full w-full">
+      <UsMap state={state} baseRegions={baseRegions} />
+      <div
+        className="absolute right-2 top-2 max-h-[92%] w-[230px] overflow-auto rounded-lg border border-hairline bg-canvas-2/90 p-2.5 text-[11px] backdrop-blur"
+        style={{ pointerEvents: "auto" }}
+      >
+        <div className="mb-1.5 font-medium text-default">
+          Model ranking · ${state.spend.toFixed(0)} → {state.medicatedCount} on therapy
+        </div>
+        {ranking.map((r) => (
+          <div
+            key={r.provider_id}
+            className="flex justify-between gap-2 py-0.5"
+            style={{ color: r.funded ? PALETTE.emerald : PALETTE.faint }}
+          >
+            <span className="truncate">#{r.rank} {r.region}</span>
+            <span className="shrink-0 tabular-nums">
+              {r.funded ? `$${r.allocation_usd.toFixed(0)} · ${r.converted}✓` : "—"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ViewToggle({ view, onChange }: { view: CenterView; onChange: (v: CenterView) => void }) {
   const opts: [CenterView, string][] = [
     ["map", "Map"],
     ["graph", "Graph"],
+    ["model", "Model"],
   ];
   return (
     <div className="z-10 flex shrink-0 items-center gap-0.5 rounded-full border border-hairline bg-canvas-2 p-0.5">

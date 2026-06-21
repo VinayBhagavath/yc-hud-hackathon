@@ -1,0 +1,214 @@
+{
+  "seed": 0,
+  "budget": 3500.0,
+  "model": "payout-q397b",
+  "total_converted": 7,
+  "n_total": 47,
+  "total_spend": 2629.8,
+  "ranking": [
+    {
+      "rank": 1,
+      "provider_id": 0,
+      "region": "SOUTHBOROUGH",
+      "allocation_usd": 471.2,
+      "n_patients": 2,
+      "converted": 2,
+      "funded": true
+    },
+    {
+      "rank": 2,
+      "provider_id": 2,
+      "region": "WESTBOROUGH",
+      "allocation_usd": 1738.0,
+      "n_patients": 2,
+      "converted": 2,
+      "funded": true
+    },
+    {
+      "rank": 3,
+      "provider_id": 6,
+      "region": "NORWOOD",
+      "allocation_usd": 0.0,
+      "n_patients": 2,
+      "converted": 0,
+      "funded": false
+    },
+    {
+      "rank": 4,
+      "provider_id": 4,
+      "region": "PITTSFIELD",
+      "allocation_usd": 0.0,
+      "n_patients": 3,
+      "converted": 0,
+      "funded": false
+    },
+    {
+      "rank": 5,
+      "provider_id": 9,
+      "region": "HOLYOKE",
+      "allocation_usd": 420.6,
+      "n_patients": 3,
+      "converted": 3,
+      "funded": true
+    },
+    {
+      "rank": 6,
+      "provider_id": 8,
+      "region": "OAK BLUFFS",
+      "allocation_usd": 0.0,
+      "n_patients": 4,
+      "converted": 0,
+      "funded": false
+    },
+    {
+      "rank": 7,
+      "provider_id": 5,
+      "region": "HAVERHILL",
+      "allocation_usd": 0.0,
+      "n_patients": 5,
+      "converted": 0,
+      "funded": false
+    },
+    {
+      "rank": 8,
+      "provider_id": 1,
+      "region": "SPRINGFIELD",
+      "allocation_usd": 0.0,
+      "n_patients": 7,
+      "converted": 0,
+      "funded": false
+    },
+    {
+      "rank": 9,
+      "provider_id": 7,
+      "region": "NORTHAMPTON",
+      "allocation_usd": 0.0,
+      "n_patients": 7,
+      "converted": 0,
+      "funded": false
+    },
+    {
+      "rank": 10,
+      "provider_id": 3,
+      "region": "UPTON",
+      "allocation_usd": 0.0,
+      "n_patients": 12,
+      "converted": 0,
+      "funded": false
+    }
+  ],
+  "baseRegions": [
+    {
+      "region": "SOUTHBOROUGH",
+      "lat": 42.305,
+      "lon": -71.525
+    },
+    {
+      "region": "WESTBOROUGH",
+      "lat": 42.269,
+      "lon": -71.616
+    },
+    {
+      "region": "NORWOOD",
+      "lat": 42.194,
+      "lon": -71.199
+    },
+    {
+      "region": "PITTSFIELD",
+      "lat": 42.45,
+      "lon": -73.245
+    },
+    {
+      "region": "HOLYOKE",
+      "lat": 42.204,
+      "lon": -72.611
+    },
+    {
+      "region": "OAK BLUFFS",
+      "lat": 41.455,
+      "lon": -70.562
+    },
+    {
+      "region": "HAVERHILL",
+      "lat": 42.776,
+      "lon": -71.077
+    },
+    {
+      "region": "SPRINGFIELD",
+      "lat": 42.101,
+      "lon": -72.59
+    },
+    {
+      "region": "NORTHAMPTON",
+      "lat": 42.328,
+      "lon": -72.63
+    },
+    {
+      "region": "UPTON",
+      "lat": 42.174,
+      "lon": -71.602
+    }
+  ],
+  "byRegion": [
+    {
+      "region": "SOUTHBOROUGH",
+      "funded": 2,
+      "medicated": 2,
+      "spend": 471.2
+    },
+    {
+      "region": "WESTBOROUGH",
+      "funded": 2,
+      "medicated": 2,
+      "spend": 1738.0
+    },
+    {
+      "region": "NORWOOD",
+      "funded": 0,
+      "medicated": 0,
+      "spend": 0.0
+    },
+    {
+      "region": "PITTSFIELD",
+      "funded": 0,
+      "medicated": 0,
+      "spend": 0.0
+    },
+    {
+      "region": "HOLYOKE",
+      "funded": 3,
+      "medicated": 3,
+      "spend": 420.6
+    },
+    {
+      "region": "OAK BLUFFS",
+      "funded": 0,
+      "medicated": 0,
+      "spend": 0.0
+    },
+    {
+      "region": "HAVERHILL",
+      "funded": 0,
+      "medicated": 0,
+      "spend": 0.0
+    },
+    {
+      "region": "SPRINGFIELD",
+      "funded": 0,
+      "medicated": 0,
+      "spend": 0.0
+    },
+    {
+      "region": "NORTHAMPTON",
+      "funded": 0,
+      "medicated": 0,
+      "spend": 0.0
+    },
+    {
+      "region": "UPTON",
+      "funded": 0,
+      "medicated": 0,
+      "spend": 0.0
+    }
+  ]
+}
