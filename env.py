@@ -106,9 +106,10 @@ async def allocate(seed: int = 0, budget: float = 1500.0, rounds: int = 3):
         f"on therapy and are removed from later rounds. Plan all {rounds} rounds up front, "
         f"spending each round's budget where it converts the most patients.\n\n"
         f"Output ONLY a single JSON object and nothing else -- no reasoning, no explanation, "
-        f"no markdown. Your response must START with '{{' and map each round to provider "
-        f"funding (each round's total <= ${budget:.0f}). Exact format:\n"
-        f'{{"round1": {{"0": 800, "3": 700}}, "round2": {{"1": 1500}}, "round3": {{"2": 900}}}}\n'
+        f"no markdown, starting with '{{'. Use the ACTUAL provider ids from the data above "
+        f"and dollar amounts YOU choose; each round's total must be <= ${budget:.0f}. Shape "
+        f"(placeholders -- fill in real ids/amounts, do not copy):\n"
+        f'{{"round1": {{"<provider_id>": <dollars>, ...}}, "round2": {{...}}, "round3": {{...}}}}\n'
         f"/no_think"   # Qwen switch: answer directly instead of emitting a <think> ramble
     )
 
