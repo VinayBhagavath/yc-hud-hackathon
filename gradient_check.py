@@ -26,8 +26,8 @@ import statistics as st
 from synthea_cohort import FEATURES, make_cohort, public_view
 from dynamics import run_round
 
-SEEDS = range(40)
-BUDGETS = (600.0, 1000.0, 1500.0, 2200.0, 3000.0)
+SEEDS = range(20)
+BUDGETS = (4000.0, 7000.0, 10000.0, 14000.0, 20000.0)
 GUESS_PER_PATIENT = 300.0  # a feature policy's blind guess at $/patient
 
 

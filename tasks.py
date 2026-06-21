@@ -15,11 +15,12 @@ from env import allocate
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 if SMOKE_TEST:
-    SEEDS = range(6)              # 6 tasks x group 4 = 24 rollouts/iter (gentle on Tinker)
-    BUDGETS = (1500.0,)           # tight -> max learning headroom (naive 0.16, ceiling 0.75)
+    SEEDS = range(4)              # 4 tasks x group 4 = 16 rollouts/iter (397B demo)
+    BUDGETS = (3500.0,)           # scarce regime for ~50-patient tasks
 else:
-    SEEDS = range(60)
-    BUDGETS = (1200.0, 1500.0, 2000.0)  # tight, non-saturating range for GRPO variance
+    # 12 tasks x group 8 = 96 rollouts/iter; each task ~33 providers / ~100 patients.
+    SEEDS = range(12)
+    BUDGETS = (3500.0,)
 
 # Expose exactly ONE taskset. Exposing both a loose list and a Taskset makes
 # HUD's module loader discover the same tasks twice -> "duplicate task slugs".

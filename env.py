@@ -1,127 +1,187 @@
-"""HUD environment: fund providers to maximize patient medication uptake.
+"""HUD environment: prioritize providers via TOOL CALLS to retrieve data.
 
-Trainable models (e.g. a forked Qwen) run under HUD's openai_compatible agent
-harness, which has NO bash/shell tool -- only filesystem + MCP. So this env is
-*tool-free*: the provider data is embedded in the prompt and the agent answers
-with its full multi-round funding plan as JSON text. That works with every model
-harness (Claude, Qwen, ...) and keeps the hidden cost-to-convert entirely
-server-side (no leak).
+The agent does NOT get a JSON dump. It calls tools to retrieve data on demand:
+  - get_providers()            -> provider summaries (features, patient counts)
+  - get_patients(provider_id)  -> that provider's patients with per-patient
+                                  clinical features (hba1c, age, income)
+  - submit_ranking(ranking)    -> provider ids in priority order; ends the episode
+The env then funds providers in that order, each just enough to convert all its
+patients, until the one-time budget runs out. Reward = fraction converted.
 
-Decision: fund providers (not patients). A patient converts when the funding to
-their provider, split evenly across that provider's still-untreated patients,
-meets that patient's hidden cost-to-convert. Converted patients are removed from
-later rounds (sticky); the budget refreshes each round.
+Cost-to-convert (k) is HIDDEN: a weak prior over the observable provider AND
+per-patient features + a dominant hidden per-provider residual (synthea_cohort).
+The agent must judge cost from the features it retrieves.
 
-  reward = total patients converted across all rounds / initial count   in [0, 1]
-
-Reward source: Synthea diabetes cohort via synthea_cohort.make_cohort; the
-cost-to-convert rule is dynamics.run_round.
+Built for a large tool-using model (Qwen 397B): it reasons briefly, inspects
+data via tools, then submits a ranking. ~50 patients/task.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
+import socket
+
+from fastmcp import FastMCP
 
 from hud import Environment
+from hud.capabilities import Capability
 
 from dynamics import run_round
-from synthea_cohort import make_cohort, public_view
+from synthea_cohort import make_cohort
 
-env = Environment(name="provider-allocation", version="0.0.1")
+env = Environment(name="provider-allocation", version="0.1.0")
+server = FastMCP(name="provider-tools")
 
-
-def _balanced_objects(s: str) -> list[str]:
-    """Return every top-level {...} balanced substring, in order of appearance."""
-    objs, depth, start = [], 0, None
-    for i, ch in enumerate(s):
-        if ch == "{":
-            if depth == 0:
-                start = i
-            depth += 1
-        elif ch == "}" and depth > 0:
-            depth -= 1
-            if depth == 0 and start is not None:
-                objs.append(s[start:i + 1])
-                start = None
-    return objs
+STATE: dict = {}   # per-rollout (one child process per rollout); set by the template
 
 
-def _coerce_plan(raw, rounds: int) -> dict[int, dict]:
-    plan: dict[int, dict] = {}
-    for key, alloc in (raw.items() if isinstance(raw, dict) else []):
-        digits = re.search(r"\d+", str(key))
-        if not digits or not isinstance(alloc, dict):
-            continue
-        r = int(digits.group(0))
-        r = r - 1 if r >= 1 else r          # "round1"/"1" -> index 0
-        if 0 <= r < rounds:
-            out = {}
-            for pid, amt in alloc.items():
-                try:
-                    out[int(pid)] = max(0.0, float(amt))
-                except (ValueError, TypeError):
-                    continue
-            plan[r] = out
-    return plan
+def _free_port() -> int:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
 
 
-def parse_plan(answer, rounds: int) -> dict[int, dict]:
-    """Pull a {round: {provider_id: amount}} plan out of the agent's text answer.
+_PORT = _free_port()
 
-    Models (esp. small ones) ramble and echo the example before the real plan,
-    so we scan ALL balanced {...} objects and take the LAST one that parses to a
-    valid plan -- skipping prose and the example (which often contains a literal
-    ``...`` that fails json.loads).
-    """
+
+def _parse_ranking_text(answer) -> list[int]:
+    """Fallback: pull an ordered list of provider ids from a text answer (last
+    JSON array of ints) -- used if the model writes its ranking instead of
+    calling submit_ranking."""
     if not isinstance(answer, str):
-        return {}
-    for cand in reversed(_balanced_objects(answer)):
+        return []
+    for cand in reversed(re.findall(r"\[[^\[\]]*\]", answer)):
         try:
-            raw = json.loads(cand)
+            arr = json.loads(cand)
         except (ValueError, TypeError):
             continue
-        plan = _coerce_plan(raw, rounds)
-        if plan:
-            return plan
-    return {}
+        ids = [int(x) for x in arr if isinstance(x, (int, float))]
+        if ids:
+            return ids
+    return []
+
+
+def _score(ranking) -> float:
+    alloc = _ranking_to_alloc(STATE["providers"], STATE["thresholds"], list(ranking), STATE["budget"])
+    newly = run_round(STATE["providers"], set(STATE["thresholds"]), STATE["thresholds"], alloc)
+    return len(newly) / STATE["n_total"] if STATE["n_total"] else 0.0
+
+
+def _ranking_to_alloc(providers, thresholds, ranking, budget) -> dict[int, float]:
+    prov = {p["id"]: p for p in providers}
+    unmed, alloc, spent, seen = set(thresholds), {}, 0.0, set()
+    for pid in ranking:
+        p = prov.get(pid)
+        if p is None or pid in seen:
+            continue
+        seen.add(pid)
+        active = [q for q in p["patients"] if q in unmed]
+        if not active:
+            continue
+        need = max(thresholds[q] for q in active) * len(active)
+        if spent + need <= budget:
+            alloc[pid] = need
+            spent += need
+            unmed -= set(active)
+    return alloc
+
+
+@server.tool
+def get_providers() -> str:
+    """List all providers with summary features (volume, avg_hba1c,
+    escalation_affinity, region) and how many untreated patients each has."""
+    if not STATE:
+        return json.dumps({"error": "no active episode"})
+    out = [{"id": p["id"], "region": p["region"], "volume": p["volume"],
+            "avg_hba1c": p["avg_hba1c"], "escalation_affinity": p["escalation_affinity"],
+            "n_patients": len(p["patients"])}
+           for p in STATE["providers"]]
+    return json.dumps({"budget": STATE["budget"], "providers": out})
+
+
+@server.tool
+def get_patients(provider_id: int) -> str:
+    """Get one provider's untreated patients with per-patient clinical features:
+    hba1c (severity), age, income. (Cost-to-convert is not shown.)"""
+    if not STATE:
+        return json.dumps({"error": "no active episode"})
+    for p in STATE["providers"]:
+        if p["id"] == provider_id:
+            return json.dumps({"provider_id": provider_id, "patients": p["patient_features"]})
+    return json.dumps({"error": f"no provider {provider_id}"})
+
+
+@server.tool
+def submit_ranking(ranking: list[int]) -> str:
+    """Submit provider ids in priority order (most cost-effective first). We fund
+    them in order, each just enough to convert all its patients, until the budget
+    runs out. This ends the episode."""
+    if not STATE:
+        return json.dumps({"error": "no active episode"})
+    STATE["reward"] = _score(ranking)
+    STATE["submitted"] = True
+    alloc = _ranking_to_alloc(STATE["providers"], STATE["thresholds"], list(ranking), STATE["budget"])
+    return json.dumps({"funded_providers": sorted(alloc),
+                       "converted": round(STATE["reward"] * STATE["n_total"]),
+                       "n_total": STATE["n_total"], "reward": round(STATE["reward"], 3)})
+
+
+_server_task: asyncio.Task | None = None
+
+
+@env.initialize
+async def _up():
+    global _server_task
+    if _server_task is None:
+        _server_task = asyncio.create_task(
+            server.run_async(transport="http", host="127.0.0.1", port=_PORT))
+        await asyncio.sleep(1.0)
+    env.add_capability(Capability.mcp(name="tools", url=f"http://127.0.0.1:{_PORT}/mcp"))
+
+
+@env.shutdown
+async def _down():
+    global _server_task
+    if _server_task is not None:
+        _server_task.cancel()
+        _server_task = None
 
 
 @env.template()
-async def allocate(seed: int = 0, budget: float = 1500.0, rounds: int = 3):
+async def allocate(seed: int = 0, budget: float = 3500.0):
     providers, thresholds = make_cohort(seed)
-    n_total = len(thresholds)
-    view = public_view(providers, set(thresholds))   # features only, NO costs
+    STATE.clear()
+    STATE.update(providers=providers, thresholds=thresholds,
+                 budget=budget, n_total=len(thresholds), reward=0.0, submitted=False)
 
     answer = yield (
-        f"You direct a patient-access program for a branded GLP-1 diabetes therapy. "
-        f"Allocate ${budget:.0f} of outreach funding across healthcare providers in EACH "
-        f"of {rounds} rounds (the budget refreshes every round) to get as many "
-        f"undertreated Type 2 Diabetes patients onto therapy as possible.\n\n"
-        f"Providers (JSON) -- each has a `region` (city), `volume`, `avg_hba1c`, and the "
-        f"ids of patients still untreated:\n{json.dumps(view)}\n\n"
-        f"A patient converts when the funding you give their provider, split evenly across "
-        f"that provider's still-untreated patients, meets that patient's hidden "
-        f"cost-to-convert (NOT shown; it correlates with region). Converted patients stay "
-        f"on therapy and are removed from later rounds. Plan all {rounds} rounds up front, "
-        f"spending each round's budget where it converts the most patients.\n\n"
-        f"Output ONLY a single JSON object and nothing else -- no reasoning, no explanation, "
-        f"no markdown, starting with '{{'. Use the ACTUAL provider ids from the data above "
-        f"and dollar amounts YOU choose; each round's total must be <= ${budget:.0f}. Shape "
-        f"(placeholders -- fill in real ids/amounts, do not copy):\n"
-        f'{{"round1": {{"<provider_id>": <dollars>, ...}}, "round2": {{...}}, "round3": {{...}}}}\n'
-        f"/no_think"   # Qwen switch: answer directly instead of emitting a <think> ramble
+        f"You direct a patient-access program for a branded GLP-1 diabetes therapy with a "
+        f"one-time outreach budget of ${budget:.0f}. Goal: put as many undertreated Type 2 "
+        f"Diabetes patients on therapy as possible.\n\n"
+        f"Use the tools to investigate, then submit a plan:\n"
+        f"  - get_providers() -- provider summaries (volume, avg_hba1c, escalation_affinity, "
+        f"region, patient count)\n"
+        f"  - get_patients(provider_id) -- a provider's patients with per-patient hba1c, age, "
+        f"income\n"
+        f"  - submit_ranking([...]) -- provider ids in priority order (most cost-effective "
+        f"first)\n\n"
+        f"Each patient has a HIDDEN cost-to-convert that the features only hint at (some "
+        f"providers/patients are much cheaper than others). We fund providers in your ranked "
+        f"order -- each just enough to convert all its patients -- until the ${budget:.0f} "
+        f"runs out, so rank the most cost-effective providers first.\n\n"
+        f"Work FAST and decisively -- do NOT deliberate at length or reason step by step. Call "
+        f"get_providers once, optionally get_patients on just a FEW providers you're unsure "
+        f"about, then IMMEDIATELY call submit_ranking with every provider id in priority order. "
+        f"Keep any thinking to one short sentence; prefer speed over thoroughness."
     )
 
-    plan = parse_plan(answer, rounds)
-    unmedicated = set(thresholds)
-    medicated = 0
-    for r in range(rounds):
-        alloc = plan.get(r, {})
-        if sum(alloc.values()) > budget:        # over budget -> wasted round
-            continue
-        newly = run_round(providers, unmedicated, thresholds, alloc)
-        unmedicated -= newly
-        medicated += len(newly)
-
-    yield medicated / n_total if n_total else 0.0
+    # Prefer the tool submission; fall back to a ranking written in the final text.
+    if not STATE.get("submitted"):
+        ranking = _parse_ranking_text(answer)
+        if ranking:
+            STATE["reward"] = _score(ranking)
+    yield STATE.get("reward", 0.0)

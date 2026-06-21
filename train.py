@@ -45,14 +45,14 @@ for _noisy in ("httpx", "httpcore", "openai", "asyncssh", "websockets", "urllib3
 # Set SMOKE_TEST=1 for a tiny, cheap run (also shrinks the taskset in tasks.py).
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
-MODEL = "payout-rl-q8b"   # 4B was too weak to emit JSON (rambled); 8B follows the format
-GROUP_SIZE = 4 if SMOKE_TEST else 8
-ITERATIONS = 2 if SMOKE_TEST else 20
+MODEL = "payout-q397b"  # fresh 397B fork (clean session pool)
+GROUP_SIZE = 4 if SMOKE_TEST else 8        # GRPO group: rollouts/task
+ITERATIONS = 5 if SMOKE_TEST else 30       # on-policy steps
 LEARNING_RATE = 1e-5
-# Cap concurrent rollouts -- unbounded gather hits the OS file-descriptor limit
-# AND can saturate the Tinker training backend (503 "no healthy keys"). Keep low.
-MAX_CONCURRENT = 2
-ROLLOUT_TIMEOUT = 300.0  # per-rollout wall-clock cap (s) so one stuck rollout can't wedge the batch
+# Tinker is healthy now, so parallelize harder. Still capped so we don't exhaust
+# local file descriptors or hammer the backend.
+MAX_CONCURRENT = 2   # 397B + session limit: keep few concurrent sessions
+ROLLOUT_TIMEOUT = 600.0  # 397B + tools is slow; let rollouts finish
 
 # Sampling temperature is REQUIRED for GRPO: rollouts in a group must differ, or
 # advantage (reward - group_mean) is ~0 and nothing is learned. Keep it > 0.
@@ -62,25 +62,22 @@ TEMPERATURE = 1.0
 async def main() -> None:
     agent = create_agent(
         MODEL,
+        max_steps=14,                     # bound the tool loop (get_providers + a few get_patients + submit)
         completion_kwargs={
             "temperature": TEMPERATURE,
-            "max_tokens": 1024,           # room to finish the JSON (it rambled+truncated before)
+            "max_tokens": 1200,           # short thinking + tool calls (speed)
             "extra_body": {"return_token_ids": True},
         },
     )
     trainer = TrainingClient(MODEL)
 
-    # Rollouts serve the env LOCALLY (same path as `hud eval`); the model is
-    # still sampled through the HUD gateway and weight updates run on HUD via
-    # TrainingClient. Swap to HUDRuntime() to run the env on HUD infra too
-    # (needs `hud deploy` first).
+    # Env runs locally; HUD does the model sampling + GRPO weight updates.
     runtime = LocalRuntime("env.py")
 
     n_tasks = len(tasks.taskset.tasks)
     print(f"[train] model={MODEL} tasks={n_tasks} group={GROUP_SIZE} "
           f"iterations={ITERATIONS} -> ~{n_tasks * GROUP_SIZE} rollouts/iter "
-          f"at {MAX_CONCURRENT}-wide. First 'iter 0' prints after iteration 0 "
-          f"finishes (can take several minutes).", flush=True)
+          f"at {MAX_CONCURRENT}-wide.", flush=True)
 
     session = await Job.start(MODEL, group=GROUP_SIZE)
     print(f"[train] job started: {session.id}  (watch live: https://hud.ai/jobs)", flush=True)
@@ -88,10 +85,17 @@ async def main() -> None:
     for it in range(ITERATIONS):
         start = len(session.runs)
         print(f"[train] iter {it}: running rollouts...", flush=True)
-        await tasks.taskset.run(
-            agent, runtime=runtime, job=session,
-            max_concurrent=MAX_CONCURRENT, rollout_timeout=ROLLOUT_TIMEOUT,
-        )
+
+        # Rollouts: tolerate a flaky backend -- skip the iteration rather than crash.
+        try:
+            await tasks.taskset.run(
+                agent, runtime=runtime, job=session,
+                max_concurrent=MAX_CONCURRENT, rollout_timeout=ROLLOUT_TIMEOUT,
+            )
+        except Exception as e:  # noqa: BLE001
+            print(f"[train] iter {it}: rollouts failed ({e!r}); skipping", flush=True)
+            continue
+
         batch = session.runs[start:]
         rewards = [r.reward for r in batch if getattr(r, "reward", None) is not None]
         errors = sum(1 for r in batch if getattr(r, "error", None))
@@ -99,10 +103,22 @@ async def main() -> None:
         spread = (max(rewards) - min(rewards)) if rewards else 0.0
         print(f"[train] iter {it}: {len(batch)} rollouts, {errors} errors, "
               f"reward mean={mean:.3f} spread={spread:.3f} -> training step...", flush=True)
-        metrics = await trainer.step(
-            batch, learning_rate=LEARNING_RATE, group_size=GROUP_SIZE
-        )
-        print(f"[train] iter {it} DONE: {metrics}", flush=True)
+
+        if spread == 0.0:
+            print(f"[train] iter {it}: zero reward spread -> no gradient, skipping step", flush=True)
+            continue
+
+        # Training step: retry once on a transient Tinker failure.
+        for attempt in range(2):
+            try:
+                metrics = await trainer.step(
+                    batch, learning_rate=LEARNING_RATE, group_size=GROUP_SIZE
+                )
+                print(f"[train] iter {it} DONE: {metrics}", flush=True)
+                break
+            except Exception as e:  # noqa: BLE001
+                print(f"[train] iter {it}: step failed (attempt {attempt + 1}/2): {e!r}", flush=True)
+                await asyncio.sleep(10)
 
 
 if __name__ == "__main__":
