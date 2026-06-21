@@ -22,9 +22,21 @@ import re
 from hud import Environment
 
 from dynamics import run_round
-from synthea_cohort import make_cohort, public_view
+from synthea_cohort import make_cohort
 
 env = Environment(name="provider-allocation", version="0.0.1")
+
+
+def build_view(providers, thresholds, unmedicated) -> list:
+    """Full per-patient view: each provider with its untreated patients, and each
+    patient's cost-to-convert shown (no longer hidden)."""
+    out = []
+    for p in providers:
+        pts = [{"id": q, "cost": round(thresholds[q])}
+               for q in p["patients"] if q in unmedicated]
+        out.append({"id": p["id"], "region": p["region"], "volume": p["volume"],
+                    "avg_hba1c": p["avg_hba1c"], "patients": pts})
+    return out
 
 
 def parse_ranking(answer) -> list[int]:
@@ -77,20 +89,23 @@ def ranking_to_alloc(providers, thresholds, ranking, budget) -> dict[int, float]
 async def allocate(seed: int = 0, budget: float = 2500.0):
     providers, thresholds = make_cohort(seed)
     n_total = len(thresholds)
-    view = public_view(providers, set(thresholds))
+    view = build_view(providers, thresholds, set(thresholds))
 
     answer = yield (
         f"You direct a patient-access program for a branded GLP-1 diabetes therapy with a "
         f"one-time outreach budget of ${budget:.0f}. Goal: put as many undertreated Type 2 "
         f"Diabetes patients on therapy as possible.\n\n"
-        f"Providers (JSON) -- each has a `region` (city), `volume`, `avg_hba1c`, and the ids "
-        f"of untreated patients:\n{json.dumps(view)}\n\n"
-        f"Each patient has a HIDDEN cost-to-convert that correlates with their provider's "
-        f"region. You do NOT set dollar amounts. Instead, RANK the providers from most to "
-        f"least cost-effective. We will fund them in your order -- each one just enough to "
-        f"convert all its patients -- until the ${budget:.0f} runs out. So put the providers "
-        f"whose patients are cheapest to convert (and who serve more patients per dollar) "
-        f"first.\n\n"
+        f"Providers (JSON) -- each has `region` (city), `volume`, `avg_hba1c`, and its list "
+        f"of untreated patients, with each patient's `cost` to convert (dollars):\n"
+        f"{json.dumps(view)}\n\n"
+        f"A patient converts when the funding you give their provider, split evenly across "
+        f"that provider's untreated patients, is >= that patient's cost. So to convert ALL of "
+        f"a provider's patients costs (its most expensive patient's cost) x (its patient "
+        f"count); providers with cheaper patients -- and more of them -- give the most "
+        f"conversions per dollar.\n\n"
+        f"You do NOT set dollar amounts. RANK the providers from most to least cost-effective; "
+        f"we fund them in your order -- each just enough to convert all its patients -- until "
+        f"the ${budget:.0f} runs out.\n\n"
         f"Output ONLY a JSON array of provider ids in priority order, nothing else, e.g. "
         f"[3, 7, 1, 4].\n/no_think"
     )
