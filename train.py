@@ -26,12 +26,17 @@ against the HUD docs skill before a long run.
 """
 
 import asyncio
+import logging
 import os
 
 from hud import Job, TrainingClient, LocalRuntime  # , HUDRuntime
 from hud.agents import create_agent
 
 import tasks
+
+# Surface HUD's INFO logs (e.g. "running N rollouts (... x group)") so the run
+# isn't silent while iteration 0 churns through rollouts before the first print.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 # Set SMOKE_TEST=1 for a tiny, cheap run (also shrinks the taskset in tasks.py).
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
@@ -66,18 +71,33 @@ async def main() -> None:
     # (needs `hud deploy` first).
     runtime = LocalRuntime("env.py")
 
+    n_tasks = len(tasks.taskset.tasks)
+    print(f"[train] model={MODEL} tasks={n_tasks} group={GROUP_SIZE} "
+          f"iterations={ITERATIONS} -> ~{n_tasks * GROUP_SIZE} rollouts/iter "
+          f"at {MAX_CONCURRENT}-wide. First 'iter 0' prints after iteration 0 "
+          f"finishes (can take several minutes).", flush=True)
+
     session = await Job.start(MODEL, group=GROUP_SIZE)
+    print(f"[train] job started: {session.id}  (watch live: https://hud.ai/jobs)", flush=True)
+
     for it in range(ITERATIONS):
         start = len(session.runs)
+        print(f"[train] iter {it}: running rollouts...", flush=True)
         await tasks.taskset.run(
             agent, runtime=runtime, job=session,
             max_concurrent=MAX_CONCURRENT, rollout_timeout=ROLLOUT_TIMEOUT,
         )
         batch = session.runs[start:]
+        rewards = [r.reward for r in batch if getattr(r, "reward", None) is not None]
+        errors = sum(1 for r in batch if getattr(r, "error", None))
+        mean = sum(rewards) / len(rewards) if rewards else 0.0
+        spread = (max(rewards) - min(rewards)) if rewards else 0.0
+        print(f"[train] iter {it}: {len(batch)} rollouts, {errors} errors, "
+              f"reward mean={mean:.3f} spread={spread:.3f} -> training step...", flush=True)
         metrics = await trainer.step(
             batch, learning_rate=LEARNING_RATE, group_size=GROUP_SIZE
         )
-        print(f"iter {it}: {metrics}")
+        print(f"[train] iter {it} DONE: {metrics}", flush=True)
 
 
 if __name__ == "__main__":
