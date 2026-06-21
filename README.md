@@ -28,22 +28,24 @@ thing Synthea replaces; see `<<< SYNTHEA SWAPS IN >>>` in `dynamics.py`.
 
 | File | Purpose |
 |------|---------|
-| `dynamics.py` | Pure reward logic (cohort gen + per-round medication rule). No HUD dep. **Synthea swaps in here.** |
-| `env.py` | HUD `Environment` + the `allocate` task template (workspace shell). |
-| `apply_round.py` | Round driver the agent runs in its workspace shell once per round. |
-| `tasks.py` | Seed × budget sweep → `tasks` (eval) and `taskset` (train). |
+| `dynamics.py` | Pure reward logic (cohort gen placeholder + per-round medication rule). No HUD dep. |
+| `synthea_cohort.py` | Real Synthea diabetes cohort (`make_cohort`/`public_view`); the live data source. |
+| `cohort_data.json` | Committed ~15KB cohort snapshot so the env runs with zero setup. |
+| `env.py` | HUD `Environment` + the tool-free `allocate` task template. |
+| `tasks.py` | Seed × budget sweep → `taskset`. |
 | `train.py` | GRPO training loop. |
 | `sanity_check.py` | Offline probe: confirms reward is allocation-sensitive (no HUD needed). |
 | `Dockerfile.hud` / `pyproject.toml` | Packaging for `hud deploy`. |
 
-## How the 3 rounds work
+## How the 3 rounds work (tool-free)
 
-HUD templates are single-turn (`yield prompt` → agent acts → `yield reward`);
-multi-step work happens in a **workspace shell** between the two yields. So the
-agent drives the 3 rounds by running `python apply_round.py` once per round:
-read `patients.json` → write `alloc.json` → run the driver (applies the round,
-removes medicated patients, refreshes the budget, rewrites `patients.json`).
-The template reads the final state to compute the reward.
+Trainable models (e.g. a forked Qwen) run under HUD's `openai_compatible` agent
+harness, which has **no bash/shell tool** — so the env uses **no tools at all**.
+Provider data is embedded in the prompt (`public_view`, costs hidden) and the
+agent answers with its full plan as JSON: `{"round1": {"<provider>": amount}, ...}`.
+The template parses it and simulates all `rounds` rounds server-side
+(sticky removal + budget refresh) to compute the reward. This works with any
+model harness and keeps the hidden cost-to-convert entirely server-side.
 
 ## Run it
 
