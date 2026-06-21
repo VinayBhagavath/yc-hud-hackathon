@@ -21,6 +21,11 @@ else:
     SEEDS = range(60)
     BUDGETS = (3000.0, 4000.0, 6000.0)
 
-# `tasks` is what `hud eval tasks.py claude` runs; `taskset` is what train.py uses.
-tasks = [allocate(seed=s, budget=b) for s in SEEDS for b in BUDGETS]
-taskset = Taskset("provider-allocation", tasks)
+# Expose exactly ONE taskset. Exposing both a loose list and a Taskset makes
+# HUD's module loader discover the same tasks twice -> "duplicate task slugs".
+# `hud eval tasks.py` and `hud sync tasks` both read this taskset; train.py uses
+# `tasks.taskset`.
+taskset = Taskset(
+    "provider-allocation",
+    [allocate(seed=s, budget=b) for s in SEEDS for b in BUDGETS],
+)
