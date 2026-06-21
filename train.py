@@ -45,13 +45,13 @@ for _noisy in ("httpx", "httpcore", "openai", "asyncssh", "websockets", "urllib3
 # Set SMOKE_TEST=1 for a tiny, cheap run (also shrinks the taskset in tasks.py).
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
-MODEL = "payout-q397"   # largest trainable Qwen (397B A17B) -- reliably emits tool calls
+MODEL = "payout-q397b"  # fresh 397B fork (clean session pool)
 GROUP_SIZE = 4 if SMOKE_TEST else 8        # GRPO group: rollouts/task
-ITERATIONS = 20 if SMOKE_TEST else 30      # on-policy steps (overnight demo)
+ITERATIONS = 5 if SMOKE_TEST else 30       # on-policy steps
 LEARNING_RATE = 1e-5
 # Tinker is healthy now, so parallelize harder. Still capped so we don't exhaust
 # local file descriptors or hammer the backend.
-MAX_CONCURRENT = 4   # 397B is heavy
+MAX_CONCURRENT = 2   # 397B + session limit: keep few concurrent sessions
 ROLLOUT_TIMEOUT = 600.0  # 397B + tools is slow; let rollouts finish
 
 # Sampling temperature is REQUIRED for GRPO: rollouts in a group must differ, or
