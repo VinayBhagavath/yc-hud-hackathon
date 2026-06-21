@@ -26,15 +26,19 @@ against the HUD docs skill before a long run.
 """
 
 import asyncio
+import os
 
 from hud import Job, TrainingClient, HUDRuntime  # , LocalRuntime
 from hud.agents import create_agent
 
 import tasks
 
+# Set SMOKE_TEST=1 for a tiny, cheap run (also shrinks the taskset in tasks.py).
+SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
+
 MODEL = "payout-rl"
-GROUP_SIZE = 8
-ITERATIONS = 20
+GROUP_SIZE = 4 if SMOKE_TEST else 8
+ITERATIONS = 2 if SMOKE_TEST else 20
 LEARNING_RATE = 1e-5
 
 # Sampling temperature is REQUIRED for GRPO: rollouts in a group must differ, or
