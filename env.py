@@ -108,7 +108,8 @@ async def allocate(seed: int = 0, budget: float = 1500.0, rounds: int = 3):
         f"Output ONLY a single JSON object and nothing else -- no reasoning, no explanation, "
         f"no markdown. Your response must START with '{{' and map each round to provider "
         f"funding (each round's total <= ${budget:.0f}). Exact format:\n"
-        f'{{"round1": {{"0": 800, "3": 700}}, "round2": {{"1": 1500}}, "round3": {{"2": 900}}}}'
+        f'{{"round1": {{"0": 800, "3": 700}}, "round2": {{"1": 1500}}, "round3": {{"2": 900}}}}\n'
+        f"/no_think"   # Qwen switch: answer directly instead of emitting a <think> ramble
     )
 
     plan = parse_plan(answer, rounds)
