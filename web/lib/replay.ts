@@ -71,6 +71,7 @@ export interface PersonItem {
   region: string;
   city: string;
   diagnosis: string;
+  gapDays: number;
   amount: number;
   outcome: Outcome;
   roundId: string;
@@ -285,6 +286,7 @@ export function computeState(
         region: fallback.region,
         city: fallback.city,
         diagnosis: ev.outcome.diagnosis,
+        gapDays: ev.outcome.diagnosis_to_treatment_gap_days,
         amount: ev.outcome.amount_usd,
         outcome: ev.outcome.outcome,
         roundId: ev.roundId,
@@ -301,6 +303,7 @@ export function computeState(
         region: ev.outcome.physician_region,
         city: lookups.geoById.get(ev.outcome.physician_id)?.city ?? ev.outcome.physician_region,
         diagnosis: ev.outcome.diagnosis,
+        gapDays: ev.outcome.diagnosis_to_treatment_gap_days,
         amount: 0,
         outcome: ev.outcome.outcome,
         roundId: ev.roundId,
@@ -345,10 +348,12 @@ export interface ReplayController {
   playing: boolean;
   speed: number;
   finished: boolean;
+  roundStarts: number[]; // event index where each round begins
   play: () => void;
   pause: () => void;
   toggle: () => void;
   seek: (i: number) => void;
+  goToRound: (roundIndex: number) => void;
   setSpeed: (s: number) => void;
   restart: () => void;
 }
@@ -365,6 +370,15 @@ export function useReplay(dashboard: DashboardPayload): ReplayController {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const finished = index >= total - 1;
+
+  // Event index where each round begins — drives the R1/R2/R3 transport chips.
+  const roundStarts = useMemo(() => {
+    const starts: number[] = [];
+    events.forEach((e, i) => {
+      if (e.kind === "round") starts.push(i);
+    });
+    return starts;
+  }, [events]);
 
   useEffect(() => {
     if (!playing || finished) return;
@@ -401,6 +415,15 @@ export function useReplay(dashboard: DashboardPayload): ReplayController {
     setIndex(0);
     setPlaying(true);
   }, []);
+  const goToRound = useCallback(
+    (roundIndex: number) => {
+      const start = roundStarts[roundIndex];
+      if (start == null) return;
+      setIndex(start);
+      setPlaying(true);
+    },
+    [roundStarts],
+  );
 
   const state = useMemo(
     () => computeState(events, index, lookups, totalRounds),
@@ -414,10 +437,12 @@ export function useReplay(dashboard: DashboardPayload): ReplayController {
     playing,
     speed,
     finished,
+    roundStarts,
     play,
     pause,
     toggle,
     seek,
+    goToRound,
     setSpeed,
     restart,
   };

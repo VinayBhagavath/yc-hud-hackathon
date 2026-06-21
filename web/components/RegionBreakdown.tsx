@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import type { ReplayState } from "@/lib/replay";
 import { usd } from "@/lib/format";
+import Placard from "./Placard";
 
 export default function RegionBreakdown({ state }: { state: ReplayState }) {
   const rows = state.byRegion;
@@ -12,10 +13,10 @@ export default function RegionBreakdown({ state }: { state: ReplayState }) {
 
   return (
     <section className="panel flex flex-col p-4">
-      <header className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold text-ink">Allocation by region</h2>
-        <span className="text-[11px] text-muted">money + people per zip</span>
-      </header>
+      <Placard
+        title="Allocation by region"
+        subtitle="Dollars routed to each physician zip · emerald = converting"
+      />
       <div className="flex flex-col gap-2.5">
         {rows.length === 0 && (
           <p className="py-6 text-center text-xs text-faint">
@@ -30,7 +31,7 @@ export default function RegionBreakdown({ state }: { state: ReplayState }) {
                 <span className="flex items-center gap-1.5 font-medium text-ink">
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
-                      r.medicated > 0 ? "bg-money" : "bg-skip"
+                      r.medicated > 0 ? "bg-emerald" : "bg-slate"
                     }`}
                   />
                   {r.region}
@@ -38,9 +39,11 @@ export default function RegionBreakdown({ state }: { state: ReplayState }) {
                 </span>
                 <span className="tabular text-ink">{usd(r.spend)}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-panel-2">
+              <div className="h-2 overflow-hidden rounded-full bg-canvas-2">
                 <motion.div
-                  className={`h-full rounded-full ${isActive ? "bg-money" : "bg-money/70"}`}
+                  className={`h-full rounded-full ${
+                    r.medicated > 0 ? "bg-emerald" : "bg-slate"
+                  } ${isActive ? "" : "opacity-70"}`}
                   initial={false}
                   animate={{ width: `${(r.spend / max) * 100}%` }}
                   transition={{ type: "spring", stiffness: 120, damping: 20 }}

@@ -11,11 +11,14 @@ import {
 } from "recharts";
 import type { EvalSummary } from "@/lib/types";
 import { titleCase, usd } from "@/lib/format";
+import { superiorityCallout } from "@/lib/selectors";
+import { PALETTE } from "@/lib/palette";
+import Placard from "./Placard";
 
 const COLOR: Record<string, string> = {
-  trained: "#34d399",
-  greedy: "#7aa2ff",
-  random: "#5a6072",
+  trained: PALETTE.gold, // the agent
+  greedy: PALETTE.slate,
+  random: PALETTE.faint,
 };
 
 export default function PolicyComparison({ evals }: { evals: EvalSummary[] }) {
@@ -27,15 +30,17 @@ export default function PolicyComparison({ evals }: { evals: EvalSummary[] }) {
       cost: e.avg_cost_per_medicated,
     }));
 
+  const { vsGreedy, vsRandom } = superiorityCallout(evals);
+
   return (
     <section className="panel flex flex-col p-4">
-      <header className="mb-1 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold text-ink">Cost per medicated</h2>
-        <span className="text-[11px] text-muted">trained vs baselines</span>
-      </header>
-      <div className="h-[132px] w-full">
+      <Placard
+        title="Cost per medicated"
+        subtitle="Trained agent vs greedy & random baselines — lower is better"
+      />
+      <div className="h-[120px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} layout="vertical" margin={{ left: 4, right: 44, top: 8, bottom: 0 }}>
+          <BarChart data={data} layout="vertical" margin={{ left: 4, right: 48, top: 4, bottom: 0 }}>
             <XAxis type="number" hide domain={[0, "dataMax"]} />
             <YAxis
               type="category"
@@ -43,23 +48,31 @@ export default function PolicyComparison({ evals }: { evals: EvalSummary[] }) {
               axisLine={false}
               tickLine={false}
               width={58}
-              tick={{ fill: "#8a91a6", fontSize: 11 }}
+              tick={{ fill: PALETTE.muted, fontSize: 11 }}
             />
             <Bar dataKey="cost" radius={[0, 5, 5, 0]} barSize={18} isAnimationActive>
               {data.map((d) => (
-                <Cell key={d.key} fill={COLOR[d.key] ?? "#5a6072"} />
+                <Cell key={d.key} fill={COLOR[d.key] ?? PALETTE.faint} />
               ))}
               <LabelList
                 dataKey="cost"
                 position="right"
                 formatter={(v: number) => usd(v)}
-                fill="#e8ecf4"
+                fill={PALETTE.ink}
                 fontSize={11}
               />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
+      {(vsGreedy != null || vsRandom != null) && (
+        <p className="mt-1 text-[11px] text-faint">
+          Trained agent medicates for{" "}
+          {vsGreedy != null && <span className="font-semibold text-gold">{vsGreedy}% less than greedy</span>}
+          {vsGreedy != null && vsRandom != null && " · "}
+          {vsRandom != null && <span className="font-semibold text-emerald">{vsRandom}% less than random</span>}
+        </p>
+      )}
     </section>
   );
 }

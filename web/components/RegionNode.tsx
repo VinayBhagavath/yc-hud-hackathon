@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { PALETTE } from "@/lib/palette";
 
 export interface RegionNodeProps {
   x: number;
@@ -53,7 +54,7 @@ export default function RegionNode({
         strokeWidth={1.4}
       />
       {/* core */}
-      <circle r={Math.max(radius * 0.32, 2.4)} fill={funded ? color : "#aeb6c8"} />
+      <circle r={Math.max(radius * 0.32, 2.4)} fill={funded ? color : PALETTE.muted} />
       {/* invisible larger hit area for hover */}
       <circle r={radius + 10} fill="transparent" />
     </g>

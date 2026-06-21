@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import type { ReplayState } from "@/lib/replay";
 import { MAP_HEIGHT, MAP_WIDTH, project, projection, TREASURY } from "@/lib/projection";
 import { usd } from "@/lib/format";
+import { PALETTE } from "@/lib/palette";
 import AllocationFlows from "./AllocationFlows";
 import RegionNode from "./RegionNode";
 
@@ -46,8 +47,8 @@ export default function UsMap({
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const activeRegion =
-    state.flows.length > 0 ? state.flows[state.flows.length - 1].region : null;
+  const newestFlow = state.flows.length > 0 ? state.flows[state.flows.length - 1] : null;
+  const activeRegion = newestFlow?.region ?? null;
 
   const nodes = useMemo<NodeDatum[]>(() => {
     const liveByRegion = new Map(state.byRegion.map((r) => [r.region, r]));
@@ -59,7 +60,8 @@ export default function UsMap({
       const spend = live?.spend ?? 0;
       const medicated = live?.medicated ?? 0;
       const funded = live?.funded ?? 0;
-      const color = funded === 0 ? "#5a6072" : medicated > 0 ? "#34d399" : "#7c8499";
+      const color =
+        funded === 0 ? PALETTE.faint : medicated > 0 ? PALETTE.emerald : PALETTE.slate;
       out.push({
         region: base.region,
         city: base.city,
@@ -80,83 +82,130 @@ export default function UsMap({
 
   const hoveredNode = nodes.find((n) => n.region === hovered) ?? null;
 
+  // One-shot bloom when the newest flow resolves to a medication.
+  const bloom =
+    newestFlow && newestFlow.outcome === "medicated"
+      ? (() => {
+          const xy = project(newestFlow.lon, newestFlow.lat);
+          return xy ? { key: newestFlow.key, ...xy } : null;
+        })()
+      : null;
+
   return (
-    <ComposableMap
-      // d3 GeoProjection instance is accepted at runtime; its call overloads
-      // just don't line up with react-simple-maps' ProjectionFunction type.
-      projection={projection as never}
-      width={MAP_WIDTH}
-      height={MAP_HEIGHT}
-      style={{ width: "100%", height: "auto" }}
-    >
-      <Geographies geography={statesTopo as object}>
-        {({ geographies }) =>
-          geographies.map((geo) => (
-            <Geography
-              key={geo.rsmKey}
-              geography={geo}
-              style={{
-                default: {
-                  fill: "#10131c",
-                  stroke: "#222a3b",
-                  strokeWidth: 0.5,
-                  outline: "none",
-                  pointerEvents: "none",
-                },
-                hover: { fill: "#10131c", outline: "none" },
-                pressed: { fill: "#10131c", outline: "none" },
-              }}
+    <div className="relative">
+      <ComposableMap
+        // d3 GeoProjection instance is accepted at runtime; its call overloads
+        // just don't line up with react-simple-maps' ProjectionFunction type.
+        projection={projection as never}
+        width={MAP_WIDTH}
+        height={MAP_HEIGHT}
+        style={{ width: "100%", height: "auto" }}
+      >
+        <Geographies geography={statesTopo as object}>
+          {({ geographies }) =>
+            geographies.map((geo) => (
+              <Geography
+                key={geo.rsmKey}
+                geography={geo}
+                style={{
+                  default: {
+                    fill: PALETTE.canvas2,
+                    stroke: PALETTE.hairline,
+                    strokeWidth: 0.6,
+                    outline: "none",
+                    pointerEvents: "none",
+                  },
+                  hover: { fill: PALETTE.canvas2, outline: "none" },
+                  pressed: { fill: PALETTE.canvas2, outline: "none" },
+                }}
+              />
+            ))
+          }
+        </Geographies>
+
+        {/* Allocation flow lines (treasury -> regions). */}
+        <AllocationFlows flows={state.flows} />
+
+        {/* Medication bloom — a gold→emerald ring at the converting region. */}
+        {bloom && (
+          <g key={bloom.key} transform={`translate(${bloom.x} ${bloom.y})`}>
+            <motion.circle
+              fill="none"
+              stroke={PALETTE.gold}
+              strokeWidth={2}
+              initial={{ r: 6, opacity: 0.95 }}
+              animate={{ r: 40, opacity: 0 }}
+              transition={{ duration: 1.1, ease: "easeOut" }}
             />
-          ))
-        }
-      </Geographies>
+            <motion.circle
+              fill={PALETTE.emerald}
+              initial={{ r: 4, opacity: 0.6 }}
+              animate={{ r: 16, opacity: 0 }}
+              transition={{ duration: 0.9, ease: "easeOut" }}
+            />
+          </g>
+        )}
 
-      {/* Allocation flow lines (treasury -> regions). */}
-      <AllocationFlows flows={state.flows} />
+        {/* Treasury anchor — the gold agent core is an HTML overlay (below) so it
+            can share a layoutId with the cold-open. Here we just draw the faint
+            seat the arcs fan out from. */}
+        <g transform={`translate(${TREASURY.x} ${TREASURY.y})`}>
+          <motion.circle
+            r={10}
+            fill="none"
+            stroke={PALETTE.gold}
+            strokeWidth={1.2}
+            initial={{ r: 10, opacity: 0.45 }}
+            animate={{ r: 30, opacity: 0 }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
+          />
+          <text
+            y={30}
+            textAnchor="middle"
+            fontSize={11}
+            fontWeight={600}
+            fill={PALETTE.gold}
+            letterSpacing={2}
+          >
+            AGENT
+          </text>
+        </g>
 
-      {/* Treasury / agent node. */}
-      <g transform={`translate(${TREASURY.x} ${TREASURY.y})`}>
-        <motion.circle
-          r={10}
-          fill="none"
-          stroke="#34d399"
-          strokeWidth={1.4}
-          initial={{ r: 10, opacity: 0.5 }}
-          animate={{ r: 26, opacity: 0 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
-        />
-        <circle r={9} fill="#0f1f1a" stroke="#34d399" strokeWidth={1.6} />
-        <path d="M -3.4 0 L 0 -4.2 L 3.4 0 L 0 4.2 Z" fill="#34d399" />
-        <text
-          y={26}
-          textAnchor="middle"
-          fontSize={11}
-          fontWeight={600}
-          fill="#8a91a6"
-          letterSpacing={1.5}
-        >
-          AGENT
-        </text>
-      </g>
+        {/* Region nodes. */}
+        {nodes.map((node) => (
+          <RegionNode
+            key={node.region}
+            x={node.x}
+            y={node.y}
+            radius={node.radius}
+            color={node.color}
+            active={node.active}
+            funded={node.funded > 0}
+            onEnter={() => setHovered(node.region)}
+            onLeave={() => setHovered((h) => (h === node.region ? null : h))}
+          />
+        ))}
 
-      {/* Region nodes. */}
-      {nodes.map((node) => (
-        <RegionNode
-          key={node.region}
-          x={node.x}
-          y={node.y}
-          radius={node.radius}
-          color={node.color}
-          active={node.active}
-          funded={node.funded > 0}
-          onEnter={() => setHovered(node.region)}
-          onLeave={() => setHovered((h) => (h === node.region ? null : h))}
-        />
-      ))}
+        {hoveredNode && <Tooltip node={hoveredNode} />}
+      </ComposableMap>
 
-      {/* SVG tooltip (kept inside the projection so it scales with the map). */}
-      {hoveredNode && <Tooltip node={hoveredNode} />}
-    </ComposableMap>
+      {/* Gold agent core — HTML overlay positioned over TREASURY. Shares
+          layoutId="agent-core" with the cold-open for a seamless morph. */}
+      <motion.div
+        layoutId="agent-core"
+        className="pointer-events-none absolute flex h-7 w-7 items-center justify-center rounded-full bg-gold text-canvas shadow-gold"
+        style={{
+          left: `${(TREASURY.x / MAP_WIDTH) * 100}%`,
+          top: `${(TREASURY.y / MAP_HEIGHT) * 100}%`,
+          transform: "translate(-50%, -50%)",
+        }}
+        transition={{ type: "spring", stiffness: 120, damping: 18 }}
+      >
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+          <path d="M8 1 L15 8 L8 15 L1 8 Z" />
+        </svg>
+      </motion.div>
+    </div>
   );
 }
 
@@ -169,7 +218,6 @@ function Tooltip({ node }: { node: NodeDatum }) {
     ["Medicated", `${node.medicated}`],
   ];
   const h = 30 + rows.length * lineH + 8;
-  // Clamp so the card stays on-canvas.
   let tx = node.x + node.radius + 12;
   if (tx + w > MAP_WIDTH) tx = node.x - node.radius - 12 - w;
   let ty = node.y - h / 2;
@@ -181,28 +229,28 @@ function Tooltip({ node }: { node: NodeDatum }) {
         width={w}
         height={h}
         rx={10}
-        fill="#0d0f16"
-        stroke="#2a3142"
+        fill={PALETTE.canvas}
+        stroke={PALETTE.hairline}
         strokeWidth={1}
         opacity={0.98}
       />
-      <text x={14} y={22} fontSize={13} fontWeight={700} fill="#e8ecf4">
+      <text x={14} y={22} fontSize={13} fontWeight={700} fill={PALETTE.ink}>
         {node.region}
       </text>
-      <text x={14} y={22} fontSize={13} fill="#e8ecf4" textAnchor="end" dx={w - 14}>
-        <tspan fontSize={10} fill="#8a91a6">
+      <text x={14} y={22} fontSize={13} fill={PALETTE.ink} textAnchor="end" dx={w - 14}>
+        <tspan fontSize={10} fill={PALETTE.muted}>
           {node.city.split(",")[1]?.trim() ?? ""}
         </tspan>
       </text>
       {rows.map(([label, value], i) => (
         <g key={label} transform={`translate(0 ${36 + i * lineH})`}>
-          <text x={14} fontSize={11} fill="#8a91a6">
+          <text x={14} fontSize={11} fill={PALETTE.muted}>
             {label}
           </text>
           <text
             x={w - 14}
             fontSize={11.5}
-            fill="#e8ecf4"
+            fill={PALETTE.ink}
             textAnchor="end"
             fontFamily="var(--font-mono)"
           >

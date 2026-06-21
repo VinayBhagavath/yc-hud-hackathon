@@ -3,12 +3,9 @@
 import { Fragment } from "react";
 import type { FlowItem } from "@/lib/replay";
 import { arcPath, project, TREASURY } from "@/lib/projection";
+import { OUTCOME_COLOR, PALETTE } from "@/lib/palette";
 
-const COLORS: Record<string, string> = {
-  medicated: "#34d399",
-  undermedicated: "#7c8499",
-  organic_medicated: "#fbbf24",
-};
+const COLORS = OUTCOME_COLOR;
 
 // How many of the most-recent flows stay "alive" (animated dashes + particle).
 const ACTIVE_WINDOW = 4;
@@ -23,7 +20,7 @@ export default function AllocationFlows({ flows }: { flows: FlowItem[] }) {
         const dest = project(flow.lon, flow.lat);
         if (!dest) return null;
         const d = arcPath(TREASURY, dest);
-        const color = COLORS[flow.outcome] ?? "#7c8499";
+        const color = COLORS[flow.outcome] ?? PALETTE.slate;
         const recency = newestIndex - i; // 0 = newest
         const isActive = recency < ACTIVE_WINDOW;
         // Older flows fade to faint persistent threads.
@@ -56,7 +53,7 @@ export default function AllocationFlows({ flows }: { flows: FlowItem[] }) {
               />
             )}
             {recency === 0 && (
-              <circle r={3.4} fill="#ffffff">
+              <circle r={3.4} fill={PALETTE.gold}>
                 <animateMotion dur="1.1s" repeatCount="indefinite" path={d} />
               </circle>
             )}
