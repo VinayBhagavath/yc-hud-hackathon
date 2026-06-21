@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agent Sponsorship HUD</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <p class="eyebrow">HUD production replay</p>
+          <h1>Agent Sponsorship Control Room</h1>
+          <p class="dek">Synthea patients, Casey's response model, William's HUD tool loop, and funded-only reward accounting in one judge-facing screen.</p>
+        </div>
+        <div class="status-strip" aria-live="polite">
+          <span class="status-dot"></span>
+          <span id="data-source">Loading read layer</span>
+        </div>
+      </header>
+
+      <main>
+        <section class="metric-grid" id="metric-grid" aria-label="Run metrics"></section>
+
+        <section class="cockpit-grid">
+          <article class="surface playback-surface">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Agent in production mode</p>
+                <h2 id="round-title">Round</h2>
+              </div>
+              <div class="control-bar" aria-label="Playback controls">
+                <button class="icon-button" id="prev-round" type="button" aria-label="Previous round">&lt;</button>
+                <button class="icon-button primary" id="play-toggle" type="button" aria-label="Play rounds">&gt;</button>
+                <button class="icon-button" id="next-round" type="button" aria-label="Next round">&gt;</button>
+              </div>
+            </div>
+
+            <div class="budget-board">
+              <div class="budget-meter">
+                <div class="meter-labels">
+                  <span>Budget used</span>
+                  <strong id="budget-used-label">$0</strong>
+                </div>
+                <div class="meter-track"><span id="budget-fill"></span></div>
+              </div>
+              <div class="round-stats" id="round-stats"></div>
+            </div>
+
+            <div class="live-grid">
+              <div class="visual-stage">
+                <div class="stage-head">
+                  <span>Allocation map</span>
+                  <strong id="allocation-caption">0 funded</strong>
+                </div>
+                <div class="allocation-map" id="allocation-map"></div>
+              </div>
+              <div class="tool-feed" id="tool-feed" aria-label="HUD tool calls"></div>
+            </div>
+
+            <div class="pool-band">
+              <div>
+                <span class="micro-label">Active pool shrinkage</span>
+                <strong id="pool-caption">12 patients</strong>
+              </div>
+              <div class="pool-visual" id="pool-visual"></div>
+            </div>
+
+            <div class="ledger-grid">
+              <div>
+                <div class="table-title">Funded decisions</div>
+                <div class="funding-table-wrap">
+                  <table class="funding-table">
+                    <thead>
+                      <tr>
+                        <th>Patient</th>
+                        <th>Signal</th>
+                        <th>Physician</th>
+                        <th>Amount</th>
+                        <th>Projection</th>
+                        <th>Outcome</th>
+                      </tr>
+                    </thead>
+                    <tbody id="funding-body"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div>
+                <div class="table-title">Observed but not rewarded</div>
+                <div class="skip-list" id="skip-list"></div>
+              </div>
+            </div>
+          </article>
+
+          <aside class="surface dossier-surface">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Casey data layer</p>
+                <h2>Patient dossiers in the active query</h2>
+              </div>
+            </div>
+            <div class="patient-queue" id="patient-queue"></div>
+          </aside>
+        </section>
+
+        <section class="analysis-grid">
+          <article class="surface">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">William training output</p>
+                <h2>Cost per medicated over training</h2>
+              </div>
+            </div>
+            <div class="svg-panel" id="training-curve"></div>
+          </article>
+
+          <article class="surface">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Baselines</p>
+                <h2>Policy comparison</h2>
+              </div>
+            </div>
+            <div class="bar-chart" id="eval-chart"></div>
+          </article>
+
+          <article class="surface">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Response model</p>
+                <h2>Diminishing returns curves</h2>
+              </div>
+            </div>
+            <div class="svg-panel" id="dose-response"></div>
+          </article>
+        </section>
+
+        <section class="analysis-grid lower">
+          <article class="surface">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Task set</p>
+                <h2>HUD eval difficulty band</h2>
+              </div>
+            </div>
+            <div class="task-grid" id="task-grid"></div>
+          </article>
+
+          <article class="surface">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Robustness</p>
+                <h2>Sensitivity sweep</h2>
+              </div>
+            </div>
+            <div class="sensitivity-list" id="sensitivity-list"></div>
+          </article>
+
+          <article class="surface">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Physician surface</p>
+                <h2>Sponsorship pressure</h2>
+              </div>
+            </div>
+            <div class="leaderboard" id="leaderboard"></div>
+          </article>
+        </section>
+
+        <section class="analysis-grid lower two">
+          <article class="surface">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Population</p>
+                <h2>Specialty mix and medication status</h2>
+              </div>
+            </div>
+            <div class="stack-chart" id="specialty-chart"></div>
+          </article>
+
+          <article class="surface">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Where money moved</p>
+                <h2>Allocation by region</h2>
+              </div>
+            </div>
+            <div class="region-grid" id="region-grid"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

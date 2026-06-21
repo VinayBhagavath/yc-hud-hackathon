@@ -1,0 +1,17 @@
+[
+  {"physician_id":"DR-014","patient_id":"PT-1011","amount_usd":0.0,"probability":0.30},
+  {"physician_id":"DR-014","patient_id":"PT-1011","amount_usd":150.0,"probability":0.37},
+  {"physician_id":"DR-014","patient_id":"PT-1011","amount_usd":300.0,"probability":0.43},
+  {"physician_id":"DR-014","patient_id":"PT-1011","amount_usd":450.0,"probability":0.48},
+  {"physician_id":"DR-014","patient_id":"PT-1011","amount_usd":600.0,"probability":0.51},
+  {"physician_id":"DR-021","patient_id":"PT-1003","amount_usd":0.0,"probability":0.35},
+  {"physician_id":"DR-021","patient_id":"PT-1003","amount_usd":150.0,"probability":0.51},
+  {"physician_id":"DR-021","patient_id":"PT-1003","amount_usd":300.0,"probability":0.62},
+  {"physician_id":"DR-021","patient_id":"PT-1003","amount_usd":450.0,"probability":0.70},
+  {"physician_id":"DR-021","patient_id":"PT-1003","amount_usd":600.0,"probability":0.75},
+  {"physician_id":"DR-030","patient_id":"PT-1009","amount_usd":0.0,"probability":0.27},
+  {"physician_id":"DR-030","patient_id":"PT-1009","amount_usd":150.0,"probability":0.33},
+  {"physician_id":"DR-030","patient_id":"PT-1009","amount_usd":300.0,"probability":0.39},
+  {"physician_id":"DR-030","patient_id":"PT-1009","amount_usd":450.0,"probability":0.43},
+  {"physician_id":"DR-030","patient_id":"PT-1009","amount_usd":600.0,"probability":0.46}
+]

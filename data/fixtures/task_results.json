@@ -1,0 +1,5 @@
+[
+  {"task_id":"easy-gap-180","difficulty":"easy","budget_total_usd":1600.0,"population_seed":17,"avg_reward":-388.0,"variance":0.18},
+  {"task_id":"medium-mixed-120","difficulty":"medium","budget_total_usd":1300.0,"population_seed":33,"avg_reward":-472.0,"variance":0.29},
+  {"task_id":"hard-saturated-90","difficulty":"hard","budget_total_usd":900.0,"population_seed":71,"avg_reward":-648.0,"variance":0.42}
+]

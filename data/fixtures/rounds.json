@@ -1,0 +1,34 @@
+[
+  {
+    "round_id": "R-001",
+    "total_spend": 1110.0,
+    "num_funded": 3,
+    "num_medicated_among_funded": 2,
+    "cost_per_medicated": 555.0,
+    "reward": -555.0
+  },
+  {
+    "round_id": "R-002",
+    "total_spend": 1180.0,
+    "num_funded": 3,
+    "num_medicated_among_funded": 3,
+    "cost_per_medicated": 393.33,
+    "reward": -393.33
+  },
+  {
+    "round_id": "R-003",
+    "total_spend": 1060.0,
+    "num_funded": 3,
+    "num_medicated_among_funded": 2,
+    "cost_per_medicated": 530.0,
+    "reward": -530.0
+  },
+  {
+    "round_id": "R-004",
+    "total_spend": 680.0,
+    "num_funded": 2,
+    "num_medicated_among_funded": 1,
+    "cost_per_medicated": 680.0,
+    "reward": -680.0
+  }
+]

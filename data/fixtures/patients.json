@@ -1,0 +1,14 @@
+[
+  {"patient_id":"PT-1001","physician_id":"DR-014","age":62,"diagnosis":"Type 2 diabetes","diagnosis_to_treatment_gap_days":184,"status":"medicated","last_round_funded_usd":420.0,"updated_at":"2026-06-20T16:20:00-07:00"},
+  {"patient_id":"PT-1002","physician_id":"DR-018","age":55,"diagnosis":"Hypertension","diagnosis_to_treatment_gap_days":241,"status":"medicated","last_round_funded_usd":300.0,"updated_at":"2026-06-20T16:22:00-07:00"},
+  {"patient_id":"PT-1003","physician_id":"DR-021","age":68,"diagnosis":"COPD","diagnosis_to_treatment_gap_days":98,"status":"medicated","last_round_funded_usd":510.0,"updated_at":"2026-06-20T16:26:00-07:00"},
+  {"patient_id":"PT-1004","physician_id":"DR-014","age":71,"diagnosis":"Heart failure","diagnosis_to_treatment_gap_days":132,"status":"medicated","last_round_funded_usd":450.0,"updated_at":"2026-06-20T16:31:00-07:00"},
+  {"patient_id":"PT-1005","physician_id":"DR-030","age":44,"diagnosis":"Type 2 diabetes","diagnosis_to_treatment_gap_days":71,"status":"undermedicated","last_round_funded_usd":0.0,"updated_at":"2026-06-20T16:34:00-07:00"},
+  {"patient_id":"PT-1006","physician_id":"DR-018","age":59,"diagnosis":"Chronic kidney disease","diagnosis_to_treatment_gap_days":312,"status":"medicated","last_round_funded_usd":460.0,"updated_at":"2026-06-20T16:41:00-07:00"},
+  {"patient_id":"PT-1007","physician_id":"DR-033","age":49,"diagnosis":"Hypertension","diagnosis_to_treatment_gap_days":145,"status":"undermedicated","last_round_funded_usd":0.0,"updated_at":"2026-06-20T16:45:00-07:00"},
+  {"patient_id":"PT-1008","physician_id":"DR-021","age":63,"diagnosis":"Asthma","diagnosis_to_treatment_gap_days":58,"status":"medicated","last_round_funded_usd":210.0,"updated_at":"2026-06-20T16:49:00-07:00"},
+  {"patient_id":"PT-1009","physician_id":"DR-030","age":77,"diagnosis":"Heart failure","diagnosis_to_treatment_gap_days":205,"status":"undermedicated","last_round_funded_usd":280.0,"updated_at":"2026-06-20T16:54:00-07:00"},
+  {"patient_id":"PT-1010","physician_id":"DR-033","age":66,"diagnosis":"COPD","diagnosis_to_treatment_gap_days":119,"status":"medicated","last_round_funded_usd":360.0,"updated_at":"2026-06-20T16:57:00-07:00"},
+  {"patient_id":"PT-1011","physician_id":"DR-014","age":73,"diagnosis":"Chronic kidney disease","diagnosis_to_treatment_gap_days":421,"status":"undermedicated","last_round_funded_usd":380.0,"updated_at":"2026-06-20T17:02:00-07:00"},
+  {"patient_id":"PT-1012","physician_id":"DR-018","age":52,"diagnosis":"Type 2 diabetes","diagnosis_to_treatment_gap_days":167,"status":"medicated","last_round_funded_usd":420.0,"updated_at":"2026-06-20T17:05:00-07:00"}
+]

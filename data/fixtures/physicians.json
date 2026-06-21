@@ -1,0 +1,7 @@
+[
+  {"physician_id":"DR-014","specialty":"Endocrinology","region":"Bay Area","panel_size":3,"dossier_summary":"High diabetes panel, long treatment gaps, prior sponsorship nearing diminishing returns.","saturation_band":"near_saturation","cumulative_sponsorship_usd":1250.0},
+  {"physician_id":"DR-018","specialty":"Internal Medicine","region":"Pacific Northwest","panel_size":3,"dossier_summary":"Mixed chronic-care panel with durable gaps and moderate sponsorship history.","saturation_band":"warming","cumulative_sponsorship_usd":1180.0},
+  {"physician_id":"DR-021","specialty":"Pulmonology","region":"Northeast","panel_size":2,"dossier_summary":"Respiratory panel responds at lower spend; current sponsorship remains efficient.","saturation_band":"fresh","cumulative_sponsorship_usd":720.0},
+  {"physician_id":"DR-030","specialty":"Cardiology","region":"Midwest","panel_size":2,"dossier_summary":"Severe patients but weaker marginal lift after early funding attempts.","saturation_band":"warming","cumulative_sponsorship_usd":560.0},
+  {"physician_id":"DR-033","specialty":"Family Medicine","region":"Southwest","panel_size":2,"dossier_summary":"Broad primary-care panel, smaller checks, variable conversion outcomes.","saturation_band":"fresh","cumulative_sponsorship_usd":360.0}
+]

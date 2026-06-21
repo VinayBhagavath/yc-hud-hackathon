@@ -1,0 +1,104 @@
+[
+  {
+    "round_id":"R-001",
+    "started_pool":12,
+    "ending_pool":10,
+    "budget":{"budget_total_usd":1400.0,"budget_remaining_usd":290.0,"patients_reviewed":5,"patients_total":12},
+    "running_spend":1110.0,
+    "running_medicated":2,
+    "running_cost_per_medicated":555.0,
+    "summary":{"round_id":"R-001","total_spend":1110.0,"num_funded":3,"num_medicated_among_funded":2,"cost_per_medicated":555.0,"reward":-555.0},
+    "tool_events":[
+      {"tool_name":"get_active_patients","status":"read","detail":"Loaded first 5 Synthea-derived dossiers"},
+      {"tool_name":"get_budget_status","status":"read","detail":"Budget $1,400 with 12 active patients"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Fund high-gap diabetes patient under DR-014","amount_usd":420.0,"patient_id":"PT-1001"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Probe low-cost hypertension case under DR-018","amount_usd":240.0,"patient_id":"PT-1002"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Fund heart-failure patient with long care gap","amount_usd":450.0,"patient_id":"PT-1004"},
+      {"tool_name":"resolve_round","status":"resolved","detail":"Reward counts funded outcomes only"}
+    ],
+    "funded":[
+      {"patient_id":"PT-1001","physician_id":"DR-014","age":62,"diagnosis":"Type 2 diabetes","diagnosis_to_treatment_gap_days":184,"physician_specialty":"Endocrinology","physician_region":"Bay Area","amount_usd":420.0,"projected_conversion_rate":0.68,"expected_lift_pp":31.0,"counted_in_reward":true,"outcome":"medicated"},
+      {"patient_id":"PT-1002","physician_id":"DR-018","age":55,"diagnosis":"Hypertension","diagnosis_to_treatment_gap_days":241,"physician_specialty":"Internal Medicine","physician_region":"Pacific Northwest","amount_usd":240.0,"projected_conversion_rate":0.42,"expected_lift_pp":14.0,"counted_in_reward":true,"outcome":"undermedicated"},
+      {"patient_id":"PT-1004","physician_id":"DR-014","age":71,"diagnosis":"Heart failure","diagnosis_to_treatment_gap_days":132,"physician_specialty":"Endocrinology","physician_region":"Bay Area","amount_usd":450.0,"projected_conversion_rate":0.61,"expected_lift_pp":24.0,"counted_in_reward":true,"outcome":"medicated"}
+    ],
+    "skipped":[
+      {"patient_id":"PT-1005","physician_id":"DR-030","age":44,"diagnosis":"Type 2 diabetes","diagnosis_to_treatment_gap_days":71,"physician_specialty":"Cardiology","physician_region":"Midwest","amount_usd":0.0,"projected_conversion_rate":0.19,"expected_lift_pp":0.0,"counted_in_reward":false,"outcome":"undermedicated"},
+      {"patient_id":"PT-1007","physician_id":"DR-033","age":49,"diagnosis":"Hypertension","diagnosis_to_treatment_gap_days":145,"physician_specialty":"Family Medicine","physician_region":"Southwest","amount_usd":0.0,"projected_conversion_rate":0.23,"expected_lift_pp":0.0,"counted_in_reward":false,"outcome":"undermedicated"}
+    ]
+  },
+  {
+    "round_id":"R-002",
+    "started_pool":10,
+    "ending_pool":7,
+    "budget":{"budget_total_usd":1300.0,"budget_remaining_usd":120.0,"patients_reviewed":6,"patients_total":10},
+    "running_spend":2290.0,
+    "running_medicated":5,
+    "running_cost_per_medicated":458.0,
+    "summary":{"round_id":"R-002","total_spend":1180.0,"num_funded":3,"num_medicated_among_funded":3,"cost_per_medicated":393.33,"reward":-393.33},
+    "tool_events":[
+      {"tool_name":"get_active_patients","status":"read","detail":"Active query excludes already-medicated patients"},
+      {"tool_name":"get_budget_status","status":"read","detail":"Budget $1,300 after task reset"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Fund efficient pulmonary response curve","amount_usd":510.0,"patient_id":"PT-1003"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Fund long-gap CKD patient under DR-018","amount_usd":460.0,"patient_id":"PT-1006"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Small top-up before saturation on DR-021","amount_usd":210.0,"patient_id":"PT-1008"},
+      {"tool_name":"resolve_round","status":"resolved","detail":"All funded patients converted"}
+    ],
+    "funded":[
+      {"patient_id":"PT-1003","physician_id":"DR-021","age":68,"diagnosis":"COPD","diagnosis_to_treatment_gap_days":98,"physician_specialty":"Pulmonology","physician_region":"Northeast","amount_usd":510.0,"projected_conversion_rate":0.72,"expected_lift_pp":37.0,"counted_in_reward":true,"outcome":"medicated"},
+      {"patient_id":"PT-1006","physician_id":"DR-018","age":59,"diagnosis":"Chronic kidney disease","diagnosis_to_treatment_gap_days":312,"physician_specialty":"Internal Medicine","physician_region":"Pacific Northwest","amount_usd":460.0,"projected_conversion_rate":0.64,"expected_lift_pp":29.0,"counted_in_reward":true,"outcome":"medicated"},
+      {"patient_id":"PT-1008","physician_id":"DR-021","age":63,"diagnosis":"Asthma","diagnosis_to_treatment_gap_days":58,"physician_specialty":"Pulmonology","physician_region":"Northeast","amount_usd":210.0,"projected_conversion_rate":0.55,"expected_lift_pp":20.0,"counted_in_reward":true,"outcome":"medicated"}
+    ],
+    "skipped":[
+      {"patient_id":"PT-1007","physician_id":"DR-033","age":49,"diagnosis":"Hypertension","diagnosis_to_treatment_gap_days":145,"physician_specialty":"Family Medicine","physician_region":"Southwest","amount_usd":0.0,"projected_conversion_rate":0.23,"expected_lift_pp":0.0,"counted_in_reward":false,"outcome":"undermedicated"}
+    ]
+  },
+  {
+    "round_id":"R-003",
+    "started_pool":7,
+    "ending_pool":5,
+    "budget":{"budget_total_usd":1150.0,"budget_remaining_usd":90.0,"patients_reviewed":5,"patients_total":7},
+    "running_spend":3350.0,
+    "running_medicated":7,
+    "running_cost_per_medicated":478.57,
+    "summary":{"round_id":"R-003","total_spend":1060.0,"num_funded":3,"num_medicated_among_funded":2,"cost_per_medicated":530.0,"reward":-530.0},
+    "tool_events":[
+      {"tool_name":"get_active_patients","status":"read","detail":"Pool has shrunk to 7 unresolved patients"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Cardiology case has severity but modest lift","amount_usd":280.0,"patient_id":"PT-1009"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Fund low-cost family medicine COPD case","amount_usd":360.0,"patient_id":"PT-1010"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Fund diabetes case before DR-018 saturates","amount_usd":420.0,"patient_id":"PT-1012"},
+      {"tool_name":"resolve_round","status":"resolved","detail":"One funded patient remained undermedicated"}
+    ],
+    "funded":[
+      {"patient_id":"PT-1009","physician_id":"DR-030","age":77,"diagnosis":"Heart failure","diagnosis_to_treatment_gap_days":205,"physician_specialty":"Cardiology","physician_region":"Midwest","amount_usd":280.0,"projected_conversion_rate":0.38,"expected_lift_pp":11.0,"counted_in_reward":true,"outcome":"undermedicated"},
+      {"patient_id":"PT-1010","physician_id":"DR-033","age":66,"diagnosis":"COPD","diagnosis_to_treatment_gap_days":119,"physician_specialty":"Family Medicine","physician_region":"Southwest","amount_usd":360.0,"projected_conversion_rate":0.57,"expected_lift_pp":25.0,"counted_in_reward":true,"outcome":"medicated"},
+      {"patient_id":"PT-1012","physician_id":"DR-018","age":52,"diagnosis":"Type 2 diabetes","diagnosis_to_treatment_gap_days":167,"physician_specialty":"Internal Medicine","physician_region":"Pacific Northwest","amount_usd":420.0,"projected_conversion_rate":0.63,"expected_lift_pp":27.0,"counted_in_reward":true,"outcome":"medicated"}
+    ],
+    "skipped":[
+      {"patient_id":"PT-1005","physician_id":"DR-030","age":44,"diagnosis":"Type 2 diabetes","diagnosis_to_treatment_gap_days":71,"physician_specialty":"Cardiology","physician_region":"Midwest","amount_usd":0.0,"projected_conversion_rate":0.19,"expected_lift_pp":0.0,"counted_in_reward":false,"outcome":"organic_medicated"}
+    ]
+  },
+  {
+    "round_id":"R-004",
+    "started_pool":5,
+    "ending_pool":4,
+    "budget":{"budget_total_usd":800.0,"budget_remaining_usd":120.0,"patients_reviewed":4,"patients_total":5},
+    "running_spend":4030.0,
+    "running_medicated":8,
+    "running_cost_per_medicated":503.75,
+    "summary":{"round_id":"R-004","total_spend":680.0,"num_funded":2,"num_medicated_among_funded":1,"cost_per_medicated":680.0,"reward":-680.0},
+    "tool_events":[
+      {"tool_name":"get_active_patients","status":"read","detail":"Final replay segment starts with 5 patients"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Retry hypertension with larger amount","amount_usd":300.0,"patient_id":"PT-1002"},
+      {"tool_name":"allocate_funding","status":"queued","detail":"Fund high-gap CKD case despite near saturation","amount_usd":380.0,"patient_id":"PT-1011"},
+      {"tool_name":"end_round","status":"queued","detail":"Agent preserves $120 instead of forcing low-lift spend"},
+      {"tool_name":"resolve_round","status":"resolved","detail":"Organic outcomes are written but excluded from reward"}
+    ],
+    "funded":[
+      {"patient_id":"PT-1002","physician_id":"DR-018","age":55,"diagnosis":"Hypertension","diagnosis_to_treatment_gap_days":241,"physician_specialty":"Internal Medicine","physician_region":"Pacific Northwest","amount_usd":300.0,"projected_conversion_rate":0.49,"expected_lift_pp":21.0,"counted_in_reward":true,"outcome":"medicated"},
+      {"patient_id":"PT-1011","physician_id":"DR-014","age":73,"diagnosis":"Chronic kidney disease","diagnosis_to_treatment_gap_days":421,"physician_specialty":"Endocrinology","physician_region":"Bay Area","amount_usd":380.0,"projected_conversion_rate":0.46,"expected_lift_pp":16.0,"counted_in_reward":true,"outcome":"undermedicated"}
+    ],
+    "skipped":[
+      {"patient_id":"PT-1007","physician_id":"DR-033","age":49,"diagnosis":"Hypertension","diagnosis_to_treatment_gap_days":145,"physician_specialty":"Family Medicine","physician_region":"Southwest","amount_usd":0.0,"projected_conversion_rate":0.23,"expected_lift_pp":0.0,"counted_in_reward":false,"outcome":"undermedicated"}
+    ]
+  }
+]

@@ -1,0 +1,5 @@
+[
+  {"policy_name":"random","avg_cost_per_medicated":820.0,"rounds_evaluated":40,"conversion_rate":0.31,"spend_efficiency_index":58.0},
+  {"policy_name":"greedy","avg_cost_per_medicated":610.0,"rounds_evaluated":40,"conversion_rate":0.43,"spend_efficiency_index":74.0},
+  {"policy_name":"trained","avg_cost_per_medicated":472.0,"rounds_evaluated":40,"conversion_rate":0.57,"spend_efficiency_index":100.0}
+]

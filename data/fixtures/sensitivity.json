@@ -1,0 +1,6 @@
+[
+  {"scenario":"Nominal response model","trained_cost_per_medicated":472.0,"random_cost_per_medicated":820.0,"greedy_cost_per_medicated":610.0},
+  {"scenario":"Lower physician elasticity","trained_cost_per_medicated":558.0,"random_cost_per_medicated":902.0,"greedy_cost_per_medicated":714.0},
+  {"scenario":"Faster saturation","trained_cost_per_medicated":604.0,"random_cost_per_medicated":955.0,"greedy_cost_per_medicated":781.0},
+  {"scenario":"Higher organic conversion","trained_cost_per_medicated":438.0,"random_cost_per_medicated":770.0,"greedy_cost_per_medicated":579.0}
+]
