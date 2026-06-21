@@ -1,17 +1,18 @@
 """HUD environment: prioritize providers to maximize patient medication uptake.
 
-ACTION = a PRIORITY RANKING of providers (not dollar amounts). Models are bad at
-budgeting dollars (they collapse to funding one provider), but good at ranking.
-So the agent outputs an ordered list of provider ids; the ENV does the money:
-it funds each provider in order just enough to put all its untreated patients on
-therapy, until the one-time budget runs out. The agent's only job is to rank
-providers by cost-effectiveness -- the real learnable skill (cost correlates with
-region, which is observable).
+Cohort: Synthea diabetes pool, feature-driven cost model (synthea_cohort), scaled
+up with generate_cohort.py to ~100 patients/task. Each patient has a HIDDEN
+cost-to-convert (k) = weak prior over observable features (volume, avg_hba1c,
+escalation_affinity) + a dominant hidden residual. The agent sees the FEATURES,
+not k -- it must judge which providers are cheap to convert. That feature->cost
+relationship is the learnable signal (gradient_check.py: SIGNAL +0.11, HEADROOM
++0.34 at budget 7000).
 
-Tool-free, single decision. Reward = patients converted / total.
+ACTION = a PRIORITY RANKING of providers (models rank well; they budget dollars
+badly). The env funds providers in the agent's order, each just enough to convert
+all its untreated patients, until the one-time budget runs out.
 
-Reward source: Synthea diabetes cohort (synthea_cohort.make_cohort) + the
-cost-to-convert rule (dynamics.run_round).
+Reward = patients converted / total.
 """
 
 from __future__ import annotations
@@ -22,28 +23,13 @@ import re
 from hud import Environment
 
 from dynamics import run_round
-from synthea_cohort import make_cohort
+from synthea_cohort import make_cohort, public_view
 
 env = Environment(name="provider-allocation", version="0.0.1")
 
 
-def build_view(providers, thresholds, unmedicated) -> list:
-    """Full per-patient view: each provider with its untreated patients, and each
-    patient's cost-to-convert shown (no longer hidden)."""
-    out = []
-    for p in providers:
-        pts = [{"id": q, "cost": round(thresholds[q])}
-               for q in p["patients"] if q in unmedicated]
-        out.append({"id": p["id"], "region": p["region"], "volume": p["volume"],
-                    "avg_hba1c": p["avg_hba1c"], "patients": pts})
-    return out
-
-
 def parse_ranking(answer) -> list[int]:
-    """Extract an ordered list of provider ids from the agent's answer.
-
-    Takes the LAST JSON array of integers in the text (skips prose / examples).
-    """
+    """Extract an ordered list of provider ids (last JSON array of ints)."""
     if not isinstance(answer, str):
         return []
     for cand in reversed(re.findall(r"\[[^\[\]]*\]", answer)):
@@ -64,8 +50,7 @@ def parse_ranking(answer) -> list[int]:
 
 def ranking_to_alloc(providers, thresholds, ranking, budget) -> dict[int, float]:
     """Fund providers in priority order, each just enough to clear ALL its
-    untreated patients, until the budget runs out. Returns {provider_id: dollars}.
-    """
+    untreated patients, until the budget runs out."""
     prov = {p["id"]: p for p in providers}
     unmed = set(thresholds)
     alloc, spent, seen = {}, 0.0, set()
@@ -77,7 +62,7 @@ def ranking_to_alloc(providers, thresholds, ranking, budget) -> dict[int, float]
         active = [q for q in p["patients"] if q in unmed]
         if not active:
             continue
-        need = max(thresholds[q] for q in active) * len(active)  # share=max_thr -> clears all
+        need = max(thresholds[q] for q in active) * len(active)
         if spent + need <= budget:
             alloc[pid] = need
             spent += need
@@ -86,28 +71,27 @@ def ranking_to_alloc(providers, thresholds, ranking, budget) -> dict[int, float]
 
 
 @env.template()
-async def allocate(seed: int = 0, budget: float = 2500.0):
+async def allocate(seed: int = 0, budget: float = 7000.0):
     providers, thresholds = make_cohort(seed)
     n_total = len(thresholds)
-    view = build_view(providers, thresholds, set(thresholds))
+    view = public_view(providers, set(thresholds))   # features only -- k is hidden
 
     answer = yield (
         f"You direct a patient-access program for a branded GLP-1 diabetes therapy with a "
         f"one-time outreach budget of ${budget:.0f}. Goal: put as many undertreated Type 2 "
         f"Diabetes patients on therapy as possible.\n\n"
-        f"Providers (JSON) -- each has `region` (city), `volume`, `avg_hba1c`, and its list "
-        f"of untreated patients, with each patient's `cost` to convert (dollars):\n"
-        f"{json.dumps(view)}\n\n"
-        f"A patient converts when the funding you give their provider, split evenly across "
-        f"that provider's untreated patients, is >= that patient's cost. So to convert ALL of "
-        f"a provider's patients costs (its most expensive patient's cost) x (its patient "
-        f"count); providers with cheaper patients -- and more of them -- give the most "
-        f"conversions per dollar.\n\n"
+        f"Providers (JSON) -- each has observable features `volume` (provider size), "
+        f"`avg_hba1c` (panel severity), `escalation_affinity` (share already escalating "
+        f"therapy), a `region`, and its list of untreated patients:\n{json.dumps(view)}\n\n"
+        f"Each patient has a HIDDEN cost-to-convert. The features correlate with it -- some "
+        f"providers are much cheaper to convert than others -- but the exact relationship is "
+        f"NOT given; judge which providers are most cost-effective from their features.\n\n"
         f"You do NOT set dollar amounts. RANK the providers from most to least cost-effective; "
         f"we fund them in your order -- each just enough to convert all its patients -- until "
         f"the ${budget:.0f} runs out.\n\n"
-        f"Output ONLY a JSON array of provider ids in priority order, nothing else, e.g. "
-        f"[3, 7, 1, 4].\n/no_think"
+        f"There are {len(providers)} providers (ids 0 to {len(providers) - 1}). Output ONLY a "
+        f"JSON array containing each provider id exactly once, in priority order, nothing else "
+        f"-- e.g. [12, 3, 27, 5, ...].\n/no_think"
     )
 
     ranking = parse_ranking(answer)
