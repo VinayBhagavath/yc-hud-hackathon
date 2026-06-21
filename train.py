@@ -47,7 +47,7 @@ SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 MODEL = "payout-q397"   # largest trainable Qwen (397B A17B) -- reliably emits tool calls
 GROUP_SIZE = 4 if SMOKE_TEST else 8        # GRPO group: rollouts/task
-ITERATIONS = 5 if SMOKE_TEST else 30       # on-policy steps
+ITERATIONS = 20 if SMOKE_TEST else 30      # on-policy steps (overnight demo)
 LEARNING_RATE = 1e-5
 # Tinker is healthy now, so parallelize harder. Still capped so we don't exhaust
 # local file descriptors or hammer the backend.

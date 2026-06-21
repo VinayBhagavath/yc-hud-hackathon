@@ -1,0 +1,385 @@
+[train] model=payout-q397 tasks=4 group=4 iterations=5 -> ~16 rollouts/iter at 4-wide.
+2026-06-21 01:18:04,475 INFO job: https://hud.ai/jobs/9a73d0b8902f4fc48d437262297a4cff
+[train] job started: 9a73d0b8902f4fc48d437262297a4cff  (watch live: https://hud.ai/jobs)
+[train] iter 0: running rollouts...
+2026-06-21 01:18:04,475 INFO running 16 rollouts (4 tasks x 4 group), max_concurrent=4
+2026-06-21 01:18:06,588 INFO Received session ID: 34d7e71caacb4b98856891877c668be5
+2026-06-21 01:18:06,589 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:18:06,589 INFO Received session ID: 5f5831a9e96e43ef949df0c45e2248bd
+2026-06-21 01:18:06,589 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:18:06,589 INFO Received session ID: c8687bec5c4849a9b44173e08f86d6d9
+2026-06-21 01:18:06,589 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:18:06,602 INFO Received session ID: d3e030a82bee47cfa5fdc09c3d9794ab
+2026-06-21 01:18:06,603 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:18:06,611 INFO step 1/14
+2026-06-21 01:18:06,744 INFO step 1/14
+2026-06-21 01:18:06,748 INFO step 1/14
+2026-06-21 01:18:06,769 INFO step 1/14
+2026-06-21 01:18:14,843 INFO   → get_providers
+2026-06-21 01:18:14,854 INFO step 2/14
+2026-06-21 01:18:15,023 INFO   → get_providers
+2026-06-21 01:18:15,034 INFO step 2/14
+2026-06-21 01:18:27,310 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:18:27,331 INFO step 3/14
+2026-06-21 01:18:34,794 INFO   → get_patients, get_patients
+2026-06-21 01:18:34,805 INFO step 4/14
+2026-06-21 01:18:35,321 INFO   → submit_ranking
+2026-06-21 01:18:35,328 INFO step 3/14
+2026-06-21 01:18:35,617 INFO   → get_providers
+2026-06-21 01:18:35,623 INFO step 2/14
+2026-06-21 01:18:42,555 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:18:42,581 INFO step 3/14
+2026-06-21 01:18:52,483 INFO Received session ID: bee2d71786334a6886767621c68b46bf
+2026-06-21 01:18:52,484 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:18:52,500 INFO step 1/14
+2026-06-21 01:18:58,492 INFO   → get_providers
+2026-06-21 01:18:58,504 INFO step 2/14
+2026-06-21 01:18:58,546 INFO   → submit_ranking
+2026-06-21 01:18:58,554 INFO step 4/14
+2026-06-21 01:19:05,196 INFO Received session ID: 0b91718723654ad895b97a274b99d8d3
+2026-06-21 01:19:05,197 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:19:05,210 INFO step 1/14
+2026-06-21 01:19:05,812 INFO   → submit_ranking
+2026-06-21 01:19:05,820 INFO step 5/14
+2026-06-21 01:19:10,559 INFO   → submit_ranking
+2026-06-21 01:19:10,567 INFO step 6/14
+2026-06-21 01:19:15,399 INFO   → get_providers
+2026-06-21 01:19:15,409 INFO step 2/14
+2026-06-21 01:19:19,038 INFO   → submit_ranking
+2026-06-21 01:19:19,044 INFO step 3/14
+2026-06-21 01:19:20,683 INFO Received session ID: db529f8037c64ace82da9e43840f40eb
+2026-06-21 01:19:20,684 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:19:20,698 INFO step 1/14
+2026-06-21 01:19:23,988 INFO   → get_patients, get_patients
+2026-06-21 01:19:24,003 INFO step 7/14
+2026-06-21 01:19:25,788 INFO   → get_providers
+2026-06-21 01:19:25,800 INFO step 2/14
+2026-06-21 01:19:30,409 INFO   → get_patients, get_patients
+2026-06-21 01:19:30,424 INFO step 8/14
+2026-06-21 01:19:30,609 INFO   → get_patients, get_patients, get_patients, get_patients
+2026-06-21 01:19:30,631 INFO step 4/14
+2026-06-21 01:19:31,021 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:19:31,039 INFO step 3/14
+2026-06-21 01:19:39,179 INFO   → submit_ranking
+2026-06-21 01:19:39,187 INFO step 9/14
+2026-06-21 01:19:44,121 INFO   → submit_ranking
+2026-06-21 01:19:44,131 INFO step 10/14
+2026-06-21 01:19:48,409 INFO   → submit_ranking
+2026-06-21 01:19:48,414 INFO step 4/14
+2026-06-21 01:19:48,897 INFO   → submit_ranking
+2026-06-21 01:19:48,907 INFO step 11/14
+2026-06-21 01:19:52,257 INFO   → submit_ranking
+2026-06-21 01:19:52,266 INFO step 3/14
+2026-06-21 01:19:53,734 INFO   → submit_ranking
+2026-06-21 01:19:53,743 INFO step 12/14
+2026-06-21 01:19:58,479 INFO   → submit_ranking
+2026-06-21 01:19:58,488 INFO step 13/14
+2026-06-21 01:20:03,457 INFO   → submit_ranking
+2026-06-21 01:20:03,466 INFO step 5/14
+2026-06-21 01:20:04,941 INFO   → submit_ranking
+2026-06-21 01:20:04,950 INFO step 14/14
+2026-06-21 01:20:05,477 INFO   → submit_ranking
+2026-06-21 01:20:05,486 INFO step 4/14
+2026-06-21 01:20:09,366 INFO   → submit_ranking
+2026-06-21 01:20:12,250 INFO Received session ID: 780670612b1f47fd8fbf0d6d5aee86f7
+2026-06-21 01:20:12,251 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:20:12,271 INFO step 1/14
+2026-06-21 01:20:12,669 INFO   → get_patients, get_patients, get_patients, get_patients
+2026-06-21 01:20:12,683 INFO step 5/14
+2026-06-21 01:20:13,981 INFO Received session ID: 997208770c5742c78c0cbc6219862fb7
+2026-06-21 01:20:13,982 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:20:13,992 INFO step 1/14
+2026-06-21 01:20:19,914 INFO   → get_providers
+2026-06-21 01:20:19,924 INFO step 2/14
+2026-06-21 01:20:21,473 INFO   → get_providers
+2026-06-21 01:20:21,485 INFO step 2/14
+2026-06-21 01:20:30,442 INFO   → submit_ranking
+2026-06-21 01:20:30,448 INFO step 6/14
+2026-06-21 01:20:35,009 INFO   → submit_ranking
+2026-06-21 01:20:35,016 INFO step 7/14
+2026-06-21 01:20:38,871 INFO   → submit_ranking
+2026-06-21 01:20:38,875 INFO step 3/14
+2026-06-21 01:20:43,773 INFO   → submit_ranking
+2026-06-21 01:20:43,777 INFO step 3/14
+2026-06-21 01:21:02,048 INFO Received session ID: 6ca0c7413d544d01bd323d5e1ca67a3d
+2026-06-21 01:21:02,048 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:21:02,056 INFO step 1/14
+2026-06-21 01:21:02,421 INFO   → get_patients, get_patients, get_patients, get_patients
+2026-06-21 01:21:02,434 INFO step 4/14
+2026-06-21 01:21:06,468 INFO   → get_providers
+2026-06-21 01:21:06,477 INFO step 2/14
+2026-06-21 01:21:18,697 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:21:18,707 INFO step 3/14
+2026-06-21 01:21:22,511 INFO Received session ID: 71a6ec0f00b74444a9fcce45bd64db23
+2026-06-21 01:21:22,511 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:21:22,519 INFO step 1/14
+2026-06-21 01:21:25,075 INFO   → submit_ranking
+2026-06-21 01:21:25,080 INFO step 5/14
+2026-06-21 01:21:26,746 INFO   → get_providers
+2026-06-21 01:21:26,752 INFO step 2/14
+2026-06-21 01:21:28,408 INFO Received session ID: 0eb2321c245448f1b0e8eed92cd9d65a
+2026-06-21 01:21:28,409 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:21:28,415 INFO step 1/14
+2026-06-21 01:21:34,512 INFO   → submit_ranking
+2026-06-21 01:21:34,516 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:21:34,521 INFO step 6/14
+2026-06-21 01:21:34,529 INFO step 3/14
+2026-06-21 01:21:35,849 INFO   → get_providers
+2026-06-21 01:21:35,855 INFO step 2/14
+2026-06-21 01:21:40,876 INFO   → submit_ranking
+2026-06-21 01:21:40,880 INFO step 4/14
+2026-06-21 01:21:47,664 INFO   → submit_ranking
+2026-06-21 01:21:47,668 INFO step 7/14
+2026-06-21 01:21:55,152 INFO   → submit_ranking
+2026-06-21 01:21:55,156 INFO step 4/14
+2026-06-21 01:21:59,649 INFO   → submit_ranking
+2026-06-21 01:21:59,654 INFO step 5/14
+2026-06-21 01:22:04,357 INFO   → submit_ranking
+2026-06-21 01:22:04,362 INFO step 3/14
+2026-06-21 01:22:05,515 INFO   → submit_ranking
+2026-06-21 01:22:05,521 INFO step 6/14
+2026-06-21 01:22:12,636 INFO Received session ID: f007066e9c3f40f990f37674d51ad57d
+2026-06-21 01:22:12,636 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:22:12,644 INFO step 1/14
+2026-06-21 01:22:16,986 INFO   → get_providers
+2026-06-21 01:22:16,993 INFO step 2/14
+2026-06-21 01:22:24,385 INFO   → submit_ranking
+2026-06-21 01:22:24,389 INFO step 7/14
+2026-06-21 01:22:30,659 INFO   → submit_ranking
+2026-06-21 01:22:30,663 INFO step 4/14
+2026-06-21 01:22:37,344 INFO Received session ID: 56397e7a97d241a2a97c28f0628d1d87
+2026-06-21 01:22:37,344 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:22:37,354 INFO step 1/14
+2026-06-21 01:22:38,093 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:22:38,106 INFO step 5/14
+2026-06-21 01:22:38,942 INFO   → submit_ranking
+2026-06-21 01:22:38,947 INFO step 8/14
+2026-06-21 01:22:42,812 INFO   → get_providers
+2026-06-21 01:22:42,820 INFO step 2/14
+2026-06-21 01:22:43,827 INFO   → submit_ranking
+2026-06-21 01:22:43,832 INFO step 3/14
+2026-06-21 01:22:52,839 INFO   → submit_ranking
+2026-06-21 01:22:52,843 INFO step 6/14
+2026-06-21 01:23:01,494 INFO   → submit_ranking
+2026-06-21 01:23:01,498 INFO step 7/14
+2026-06-21 01:23:03,593 INFO   → submit_ranking
+2026-06-21 01:23:03,597 INFO step 3/14
+2026-06-21 01:23:05,558 INFO Received session ID: 20bc10430d8c4a129faf9510a595a650
+2026-06-21 01:23:05,558 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:23:05,566 INFO step 1/14
+2026-06-21 01:23:09,729 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:23:09,739 INFO step 8/14
+2026-06-21 01:23:12,971 INFO   → get_providers
+2026-06-21 01:23:12,978 INFO step 2/14
+2026-06-21 01:23:22,682 INFO Received session ID: 2ce18992c0a44e1a9f49792a93558fe8
+2026-06-21 01:23:22,682 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:23:22,691 INFO step 1/14
+2026-06-21 01:23:31,244 INFO   → submit_ranking
+2026-06-21 01:23:31,248 INFO step 3/14
+[train] iter 0: 16 rollouts, 0 errors, reward mean=0.279 spread=0.600 -> training step...
+[train] iter 0 DONE: step=1 checkpoint_id='e477deee-524b-481d-842a-0470572ec0c9' sampler_path='tinker://f042cff7-ec6a-514f-9feb-586fb5623914:train:0/sampler_weights/step-000001' state_path='tinker://f042cff7-ec6a-514f-9feb-586fb5623914:train:0/weights/step-000001' model='payout-q397'
+[train] iter 1: running rollouts...
+2026-06-21 01:25:12,400 INFO running 16 rollouts (4 tasks x 4 group), max_concurrent=4
+2026-06-21 01:25:14,403 INFO Received session ID: c8094b20ca88432d953f37c76b825952
+2026-06-21 01:25:14,404 INFO Received session ID: 0a8147d283fa44ec932146ffea75a404
+2026-06-21 01:25:14,404 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:25:14,404 INFO Received session ID: a2957eb238f346c79cd8d9904725fcb6
+2026-06-21 01:25:14,404 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:25:14,404 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:25:14,404 INFO Received session ID: 8e5d052edb1b4a50beba18dc806b45cf
+2026-06-21 01:25:14,405 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:25:14,417 INFO step 1/14
+2026-06-21 01:25:14,418 INFO step 1/14
+2026-06-21 01:25:14,419 INFO step 1/14
+2026-06-21 01:25:14,420 INFO step 1/14
+2026-06-21 01:25:44,343 INFO   → get_providers
+2026-06-21 01:25:44,351 INFO step 2/14
+2026-06-21 01:25:45,892 INFO   → get_providers
+2026-06-21 01:25:45,898 INFO step 2/14
+2026-06-21 01:25:48,352 INFO   → get_providers
+2026-06-21 01:25:48,358 INFO step 2/14
+2026-06-21 01:25:58,283 INFO   → get_providers
+2026-06-21 01:25:58,289 INFO step 2/14
+2026-06-21 01:26:16,765 INFO   → submit_ranking
+2026-06-21 01:26:16,769 INFO step 3/14
+2026-06-21 01:26:20,650 INFO   → submit_ranking
+2026-06-21 01:26:20,655 INFO step 3/14
+2026-06-21 01:26:33,043 INFO   → submit_ranking
+2026-06-21 01:26:33,048 INFO step 3/14
+2026-06-21 01:26:36,562 INFO   → get_patients, get_patients, get_patients, get_patients
+2026-06-21 01:26:36,575 INFO step 4/14
+2026-06-21 01:26:38,925 INFO Received session ID: 14fe6b7d58e24dfcadcadc43c7c728bb
+2026-06-21 01:26:38,925 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:26:38,932 INFO step 1/14
+2026-06-21 01:26:40,495 INFO   → submit_ranking
+2026-06-21 01:26:40,501 INFO step 3/14
+2026-06-21 01:26:50,996 INFO   → get_providers
+2026-06-21 01:26:51,005 INFO step 2/14
+2026-06-21 01:27:01,236 INFO   → submit_ranking
+2026-06-21 01:27:01,241 INFO step 4/14
+2026-06-21 01:27:05,853 INFO Received session ID: 96b54617d03b489588ae93fff603eedc
+2026-06-21 01:27:05,854 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:27:05,862 INFO step 1/14
+2026-06-21 01:27:16,353 INFO   → get_providers
+2026-06-21 01:27:16,360 INFO step 2/14
+2026-06-21 01:27:17,656 INFO   → submit_ranking
+2026-06-21 01:27:17,660 INFO step 3/14
+2026-06-21 01:27:22,061 INFO   → submit_ranking
+2026-06-21 01:27:22,066 INFO step 5/14
+2026-06-21 01:27:33,894 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:27:33,905 INFO step 5/14
+2026-06-21 01:27:36,189 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:27:36,200 INFO step 4/14
+2026-06-21 01:27:55,651 INFO   → submit_ranking
+2026-06-21 01:27:55,659 INFO step 5/14
+2026-06-21 01:27:57,312 INFO   → submit_ranking
+2026-06-21 01:27:57,319 INFO step 3/14
+2026-06-21 01:27:59,793 INFO   → submit_ranking
+2026-06-21 01:27:59,800 INFO step 6/14
+2026-06-21 01:28:03,032 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:28:03,048 INFO step 6/14
+2026-06-21 01:28:14,117 INFO   → submit_ranking
+2026-06-21 01:28:14,126 INFO step 6/14
+2026-06-21 01:28:30,098 INFO   → submit_ranking
+2026-06-21 01:28:30,106 INFO step 4/14
+2026-06-21 01:28:32,681 INFO   → submit_ranking
+2026-06-21 01:28:32,689 INFO step 7/14
+2026-06-21 01:28:57,304 INFO   → submit_ranking
+2026-06-21 01:28:57,313 INFO step 5/14
+2026-06-21 01:29:00,820 INFO Received session ID: 2afb49a294b04f31a0020a319d477863
+2026-06-21 01:29:00,821 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:29:00,835 INFO step 1/14
+2026-06-21 01:29:09,556 INFO   → get_providers
+2026-06-21 01:29:09,567 INFO step 2/14
+2026-06-21 01:29:16,041 INFO Received session ID: 67cffe2a02344830be1cd1660700b6e0
+2026-06-21 01:29:16,041 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:29:16,057 INFO step 1/14
+2026-06-21 01:29:28,303 INFO   → submit_ranking
+2026-06-21 01:29:28,312 INFO step 6/14
+2026-06-21 01:29:33,135 INFO Received session ID: 64f67e28872e40c58aa468032989197b
+2026-06-21 01:29:33,136 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:29:33,151 INFO step 1/14
+2026-06-21 01:29:40,880 INFO   → get_providers
+2026-06-21 01:29:40,889 INFO step 2/14
+2026-06-21 01:29:42,577 INFO   → submit_ranking
+2026-06-21 01:29:42,586 INFO step 3/14
+2026-06-21 01:29:53,578 INFO   → submit_ranking
+2026-06-21 01:29:53,587 INFO step 7/14
+2026-06-21 01:30:06,310 INFO   → submit_ranking
+2026-06-21 01:30:06,319 INFO step 3/14
+2026-06-21 01:30:21,301 INFO   → submit_ranking
+2026-06-21 01:30:21,310 INFO step 8/14
+2026-06-21 01:30:24,350 INFO Received session ID: b3dbb2ca7a34451f88eaaf315b7912b1
+2026-06-21 01:30:24,351 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:30:24,368 INFO step 1/14
+2026-06-21 01:30:30,080 INFO   → get_patients, get_patients, get_patients, get_patients
+2026-06-21 01:30:30,102 INFO step 4/14
+2026-06-21 01:30:42,798 INFO   → get_providers
+2026-06-21 01:30:42,808 INFO step 2/14
+2026-06-21 01:30:44,733 INFO   → submit_ranking
+2026-06-21 01:30:44,742 INFO step 9/14
+2026-06-21 01:30:45,174 INFO Received session ID: fb74579950a343509c750249bf8599d9
+2026-06-21 01:30:45,175 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:30:45,185 INFO step 1/14
+2026-06-21 01:30:59,716 INFO   → submit_ranking
+2026-06-21 01:30:59,725 INFO step 5/14
+2026-06-21 01:31:08,273 INFO   → submit_ranking
+2026-06-21 01:31:08,282 INFO step 3/14
+2026-06-21 01:31:16,061 INFO   → get_providers
+2026-06-21 01:31:16,073 INFO step 2/14
+2026-06-21 01:31:30,360 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:31:30,377 INFO step 4/14
+2026-06-21 01:31:36,950 INFO   → submit_ranking
+2026-06-21 01:31:36,958 INFO step 3/14
+2026-06-21 01:31:44,589 INFO   → submit_ranking
+2026-06-21 01:31:44,597 INFO step 6/14
+2026-06-21 01:31:48,269 INFO Received session ID: 949e1e77419a47098d14b71a490a7462
+2026-06-21 01:31:48,269 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:31:48,282 INFO step 1/14
+2026-06-21 01:31:57,370 INFO   → get_providers
+2026-06-21 01:31:57,384 INFO step 2/14
+2026-06-21 01:31:58,601 INFO   → get_patients, get_patients, get_patients, get_patients
+2026-06-21 01:31:58,631 INFO step 7/14
+2026-06-21 01:32:11,485 INFO Received session ID: a9a9687a8bf9405cb41bc46438d0672c
+2026-06-21 01:32:11,486 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:32:11,499 INFO step 1/14
+2026-06-21 01:32:35,805 INFO   → submit_ranking
+2026-06-21 01:32:35,810 INFO step 3/14
+2026-06-21 01:32:37,215 INFO Received session ID: 8a60452f12634dfa919355def11848bb
+2026-06-21 01:32:37,216 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:32:37,227 INFO step 1/14
+2026-06-21 01:32:56,042 INFO   → get_patients, get_patients, get_patients
+2026-06-21 01:32:56,063 INFO step 4/14
+2026-06-21 01:33:00,260 INFO Received session ID: 1691530c6e7140ce82db9042054017ba
+2026-06-21 01:33:00,261 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:33:00,278 INFO step 1/14
+2026-06-21 01:33:00,422 INFO Received session ID: c3a663437a8749aa8606899bad36c6ff
+2026-06-21 01:33:00,423 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:33:00,432 INFO step 1/14
+2026-06-21 01:33:20,859 INFO   → get_providers
+2026-06-21 01:33:20,871 INFO step 2/14
+2026-06-21 01:33:31,202 INFO   → submit_ranking
+2026-06-21 01:33:31,211 INFO step 5/14
+2026-06-21 01:33:42,705 INFO   → submit_ranking
+2026-06-21 01:33:42,713 INFO step 3/14
+2026-06-21 01:33:56,487 INFO   → submit_ranking
+2026-06-21 01:33:56,495 INFO step 6/14
+2026-06-21 01:34:06,186 INFO   → get_providers
+2026-06-21 01:34:06,196 INFO step 2/14
+2026-06-21 01:34:21,174 INFO   → submit_ranking
+2026-06-21 01:34:21,182 INFO step 7/14
+2026-06-21 01:34:38,578 INFO   → submit_ranking
+2026-06-21 01:34:38,586 INFO step 8/14
+2026-06-21 01:34:45,487 INFO   → submit_ranking
+2026-06-21 01:34:45,496 INFO step 3/14
+2026-06-21 01:35:01,252 INFO   → submit_ranking
+2026-06-21 01:35:01,261 INFO step 4/14
+2026-06-21 01:35:01,661 INFO   → submit_ranking
+2026-06-21 01:35:01,670 INFO step 9/14
+2026-06-21 01:35:20,621 INFO   → submit_ranking
+2026-06-21 01:35:20,630 INFO step 5/14
+2026-06-21 01:35:22,410 INFO   → submit_ranking
+2026-06-21 01:35:22,419 INFO step 10/14
+2026-06-21 01:35:35,487 INFO   → submit_ranking
+2026-06-21 01:35:35,497 INFO step 11/14
+2026-06-21 01:35:36,746 INFO   → get_patients, get_patients, get_patients, get_patients
+2026-06-21 01:35:36,771 INFO step 6/14
+2026-06-21 01:36:10,290 INFO   → submit_ranking
+2026-06-21 01:36:10,299 INFO step 12/14
+2026-06-21 01:36:13,842 INFO   → submit_ranking
+2026-06-21 01:36:13,852 INFO step 7/14
+[train] iter 1: 16 rollouts, 0 errors, reward mean=0.165 spread=0.295 -> training step...
+[train] iter 1 DONE: step=2 checkpoint_id='e8f10c39-0bd1-4fc3-b77c-bf869a974720' sampler_path='tinker://f042cff7-ec6a-514f-9feb-586fb5623914:train:0/sampler_weights/step-000002' state_path='tinker://f042cff7-ec6a-514f-9feb-586fb5623914:train:0/weights/step-000002' model='payout-q397'
+[train] iter 2: running rollouts...
+2026-06-21 01:37:45,536 INFO running 16 rollouts (4 tasks x 4 group), max_concurrent=4
+2026-06-21 01:37:47,611 INFO Received session ID: 556f027e24294422b5d360ee573009d8
+2026-06-21 01:37:47,612 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:37:47,616 INFO Received session ID: a2bd4a49da614b68bedd07ad3a1e32fe
+2026-06-21 01:37:47,617 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:37:47,618 INFO Received session ID: 60fb6243b08b4c048dfc97c4ca8e6205
+2026-06-21 01:37:47,619 INFO Received session ID: cde2e21a2c3a44b9ac5c9971bdcd4329
+2026-06-21 01:37:47,619 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:37:47,619 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:37:47,628 INFO step 1/14
+2026-06-21 01:37:47,633 INFO step 1/14
+2026-06-21 01:37:47,635 INFO step 1/14
+2026-06-21 01:37:47,635 INFO step 1/14
+2026-06-21 01:37:49,184 WARNING Error getting response Error code: 400 - {'detail': 'Too many active sessions. Please ensure you are not creating extra ServiceClient objects and ServiceClient objects are properly closed in your training script.'}
+2026-06-21 01:37:49,639 WARNING Error getting response Error code: 400 - {'detail': 'Too many active sessions. Please ensure you are not creating extra ServiceClient objects and ServiceClient objects are properly closed in your training script.'}
+2026-06-21 01:37:50,066 WARNING Error getting response Error code: 400 - {'detail': 'Too many active sessions. Please ensure you are not creating extra ServiceClient objects and ServiceClient objects are properly closed in your training script.'}
+2026-06-21 01:37:50,536 WARNING Error getting response Error code: 400 - {'detail': 'Too many active sessions. Please ensure you are not creating extra ServiceClient objects and ServiceClient objects are properly closed in your training script.'}
+2026-06-21 01:37:52,517 INFO Received session ID: d4b30cc82c3a4210ae2caec6af3800f6
+2026-06-21 01:37:52,518 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:37:52,531 INFO step 1/14
+2026-06-21 01:37:52,632 INFO Received session ID: 2518e2b901934e16896a1fc9e03df31c
+2026-06-21 01:37:52,633 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:37:52,644 INFO step 1/14
+2026-06-21 01:37:53,274 INFO Received session ID: 71c7c3b363b841baa1c369da0bcaf681
+2026-06-21 01:37:53,274 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:37:53,282 INFO step 1/14
+2026-06-21 01:37:53,337 INFO Received session ID: f682839f6d354158b84a62ef6a0d49f8
+2026-06-21 01:37:53,337 INFO Negotiated protocol version: 2025-11-25
+2026-06-21 01:37:53,347 INFO step 1/14
+2026-06-21 01:37:54,385 WARNING Error getting response Error code: 400 - {'detail': 'Too many active sessions. Please ensure you are not creating extra ServiceClient objects and ServiceClient objects are properly closed in your training script.'}
+2026-06-21 01:37:54,684 WARNING Error getting response Error code: 400 - {'detail': 'Too many active sessions. Please ensure you are not creating extra ServiceClient objects and ServiceClient objects are properly closed in your training script.'}
+2026-06-21 01:37:55,649 WARNING Error getting response Error code: 400 - {'detail': 'Too many active sessions. Please ensure you are not creating extra ServiceClient objects and ServiceClient objects are properly closed in your training script.'}
