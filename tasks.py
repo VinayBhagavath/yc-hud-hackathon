@@ -18,8 +18,10 @@ if SMOKE_TEST:
     SEEDS = range(6)              # 6 tasks x group 4 = 24 rollouts/iter (gentle on Tinker)
     BUDGETS = (1500.0,)           # tight -> max learning headroom (naive 0.16, ceiling 0.75)
 else:
-    SEEDS = range(60)
-    BUDGETS = (1200.0, 1500.0, 2000.0)  # tight, non-saturating range for GRPO variance
+    # Sized for the slow/flaky Tinker backend: 8 tasks x group 6 = 48 rollouts/iter.
+    # Enough within-group variance for GRPO and few enough to finish a real run.
+    SEEDS = range(8)
+    BUDGETS = (1500.0,)
 
 # Expose exactly ONE taskset. Exposing both a loose list and a Taskset makes
 # HUD's module loader discover the same tasks twice -> "duplicate task slugs".

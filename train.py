@@ -46,8 +46,8 @@ for _noisy in ("httpx", "httpcore", "openai", "asyncssh", "websockets", "urllib3
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 MODEL = "payout-rl-q8b"   # 4B was too weak to emit JSON (rambled); 8B follows the format
-GROUP_SIZE = 4 if SMOKE_TEST else 8
-ITERATIONS = 2 if SMOKE_TEST else 20
+GROUP_SIZE = 4 if SMOKE_TEST else 6
+ITERATIONS = 2 if SMOKE_TEST else 15
 LEARNING_RATE = 1e-5
 # Cap concurrent rollouts -- unbounded gather hits the OS file-descriptor limit
 # AND can saturate the Tinker training backend (503 "no healthy keys"). Keep low.
@@ -88,10 +88,17 @@ async def main() -> None:
     for it in range(ITERATIONS):
         start = len(session.runs)
         print(f"[train] iter {it}: running rollouts...", flush=True)
-        await tasks.taskset.run(
-            agent, runtime=runtime, job=session,
-            max_concurrent=MAX_CONCURRENT, rollout_timeout=ROLLOUT_TIMEOUT,
-        )
+
+        # Rollouts: tolerate a flaky backend -- skip the iteration rather than crash.
+        try:
+            await tasks.taskset.run(
+                agent, runtime=runtime, job=session,
+                max_concurrent=MAX_CONCURRENT, rollout_timeout=ROLLOUT_TIMEOUT,
+            )
+        except Exception as e:  # noqa: BLE001
+            print(f"[train] iter {it}: rollouts failed ({e!r}); skipping", flush=True)
+            continue
+
         batch = session.runs[start:]
         rewards = [r.reward for r in batch if getattr(r, "reward", None) is not None]
         errors = sum(1 for r in batch if getattr(r, "error", None))
@@ -99,10 +106,22 @@ async def main() -> None:
         spread = (max(rewards) - min(rewards)) if rewards else 0.0
         print(f"[train] iter {it}: {len(batch)} rollouts, {errors} errors, "
               f"reward mean={mean:.3f} spread={spread:.3f} -> training step...", flush=True)
-        metrics = await trainer.step(
-            batch, learning_rate=LEARNING_RATE, group_size=GROUP_SIZE
-        )
-        print(f"[train] iter {it} DONE: {metrics}", flush=True)
+
+        if spread == 0.0:
+            print(f"[train] iter {it}: zero reward spread -> no gradient, skipping step", flush=True)
+            continue
+
+        # Training step: retry once on a transient Tinker failure.
+        for attempt in range(2):
+            try:
+                metrics = await trainer.step(
+                    batch, learning_rate=LEARNING_RATE, group_size=GROUP_SIZE
+                )
+                print(f"[train] iter {it} DONE: {metrics}", flush=True)
+                break
+            except Exception as e:  # noqa: BLE001
+                print(f"[train] iter {it}: step failed (attempt {attempt + 1}/2): {e!r}", flush=True)
+                await asyncio.sleep(10)
 
 
 if __name__ == "__main__":
