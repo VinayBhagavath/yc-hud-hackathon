@@ -79,11 +79,17 @@ INSULIN_KEY = "insulin"          # escalation marker in medication DESCRIPTION
 # hidden residual -- intentionally larger than the feature spread so the task
 # rewards exploration, not just zero-shot reasoning.
 BASE_COST = 200.0
-BETA = {"volume": 0.25, "avg_hba1c": 0.20, "escalation_affinity": 0.35}
+BETA = {"volume": 0.25, "avg_hba1c": 0.20, "escalation_affinity": 0.35}  # provider prior
+# Per-PATIENT weak prior over real per-patient features (sign: sicker / wealthier
+# -> cheaper to convert, older -> costlier). Replaces pure-noise jitter so each
+# patient's own data affects their cost. Dominant signal stays the hidden
+# per-provider residual.
+PATIENT_BETA = {"hba1c": 0.30, "income": 0.20, "age": -0.15}
+AGE_REF_YEAR = 2025
 RESID_SIGMA = 0.80               # hidden per-provider lognormal spread (DOMINANT)
-JITTER = (0.90, 1.10)            # hidden per-patient multiplier band
+JITTER = (0.95, 1.05)            # small residual per-patient noise on top of the prior
 
-DEFAULT_PROVIDERS_PER_TASK = 33   # ~100 patients/task
+DEFAULT_PROVIDERS_PER_TASK = 10   # ~48 patients/task
 MIN_PANEL = 2                    # ignore providers with a tiny undertreated panel
 
 csv.field_size_limit(sys.maxsize)
@@ -159,6 +165,21 @@ def _build_pool():
     # 3. undertreated = diabetic + uncontrolled (the convertible pool, n_i)
     undertreated = {p: v for p, (_, v) in latest.items() if v >= UNCONTROLLED_HBA1C}
 
+    # 3b. per-patient demographics (real, from patients.csv): age + income
+    demo = {}
+    for r in _stream("patients.csv"):
+        if r["Id"] not in undertreated:
+            continue
+        try:
+            age = AGE_REF_YEAR - int(r["BIRTHDATE"][:4])
+        except (ValueError, KeyError):
+            age = 60
+        try:
+            income = int(float(r["INCOME"] or 0))
+        except (ValueError, KeyError):
+            income = 0
+        demo[r["Id"]] = {"age": age, "income": income}
+
     # 4. escalation: diabetics already on insulin (proxy for "willing to escalate")
     insulin = {r["PATIENT"] for r in _stream("medications.csv")
                if INSULIN_KEY in r["DESCRIPTION"].lower()}
@@ -198,19 +219,34 @@ def _build_pool():
     if not raw:
         return []
 
-    # 8. standardize features over the pool, then assign the hidden thresholds
+    # 8a. per-patient feature table (hba1c + demographics), z-scored pool-wide
+    pfeat = {}
+    for prov, under in prov_under.items():
+        for p in under:
+            d = demo.get(p, {"age": 60, "income": 0})
+            pfeat[p] = {"hba1c": round(undertreated[p], 2),
+                        "age": d["age"], "income": d["income"]}
+    pzf = {f: _zscore([pfeat[p][f] for p in pfeat]) for f in PATIENT_BETA}
+
+    # 8b. standardize provider features, then assign the hidden per-patient k:
+    #     k = BASE * provider_prior * provider_residual * patient_prior * jitter
     zf = {f: _zscore([r[f] for r in raw]) for f in BETA}
     pool = []
     for r in raw:
-        log_prior = -sum(BETA[f] * zf[f](r[f]) for f in BETA)   # weak prior
+        log_prior = -sum(BETA[f] * zf[f](r[f]) for f in BETA)        # provider prior
         base_k = BASE_COST * math.exp(log_prior) * _provider_resid(r["uuid"])
+        patients, thresholds = [], {}
+        for p in r["under"]:
+            pf = pfeat[p]
+            pat_mult = math.exp(-sum(PATIENT_BETA[f] * pzf[f](pf[f]) for f in PATIENT_BETA))
+            thresholds[p] = round(base_k * pat_mult * _patient_jitter(p), 1)
+            patients.append({"uuid": p, **pf})                       # observable per-patient
         pool.append({
             "uuid": r["uuid"], "city": r["city"], "state": r["state"],
             "volume": r["volume"], "avg_hba1c": r["avg_hba1c"],
             "escalation_affinity": r["escalation_affinity"],
-            "patients": r["under"],
-            "thresholds": {p: round(base_k * _patient_jitter(p), 1)
-                           for p in r["under"]},
+            "patients": patients,
+            "thresholds": thresholds,
         })
     pool.sort(key=lambda d: d["uuid"])
     return pool
@@ -267,18 +303,22 @@ def make_cohort(seed: int, n_providers: int = DEFAULT_PROVIDERS_PER_TASK,
     providers_public, thresholds = [], {}
     next_pid = 0
     for j, prov in enumerate(chosen):
-        patient_ids = []
-        for puuid in prov["patients"]:
+        patient_ids, patient_features = [], []
+        for pat in prov["patients"]:
+            puuid = pat["uuid"]
             thresholds[next_pid] = prov["thresholds"][puuid]
+            patient_features.append({"id": next_pid, "hba1c": pat["hba1c"],
+                                     "age": pat["age"], "income": pat["income"]})
             patient_ids.append(next_pid)
             next_pid += 1
         providers_public.append({
             "id": j,
             "region": prov["city"],                          # context (not cost-driving)
-            "volume": prov["volume"],                        # OBSERVABLE feature
-            "avg_hba1c": prov["avg_hba1c"],                  # OBSERVABLE feature
-            "escalation_affinity": prov["escalation_affinity"],  # OBSERVABLE feature
-            "patients": patient_ids,
+            "volume": prov["volume"],                        # OBSERVABLE provider feature
+            "avg_hba1c": prov["avg_hba1c"],                  # OBSERVABLE provider feature
+            "escalation_affinity": prov["escalation_affinity"],  # OBSERVABLE provider feature
+            "patients": patient_ids,                         # ids (run_round / ranking)
+            "patient_features": patient_features,            # per-patient observable data
         })
     return providers_public, thresholds
 

@@ -16,11 +16,11 @@ SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 if SMOKE_TEST:
     SEEDS = range(6)              # 6 tasks x group 4 = 24 rollouts/iter
-    BUDGETS = (7000.0,)           # scarce regime for ~100-patient tasks (even 0.23, oracle 0.90)
+    BUDGETS = (3500.0,)           # scarce regime for ~50-patient tasks
 else:
     # 12 tasks x group 8 = 96 rollouts/iter; each task ~33 providers / ~100 patients.
     SEEDS = range(12)
-    BUDGETS = (7000.0,)
+    BUDGETS = (3500.0,)
 
 # Expose exactly ONE taskset. Exposing both a loose list and a Taskset makes
 # HUD's module loader discover the same tasks twice -> "duplicate task slugs".

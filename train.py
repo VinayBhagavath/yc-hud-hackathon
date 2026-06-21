@@ -45,7 +45,7 @@ for _noisy in ("httpx", "httpcore", "openai", "asyncssh", "websockets", "urllib3
 # Set SMOKE_TEST=1 for a tiny, cheap run (also shrinks the taskset in tasks.py).
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
-MODEL = "payout-feat"   # fresh Qwen3-8B fork (clean checkpoints); feature-driven cohort
+MODEL = "payout-q397"   # largest trainable Qwen (397B A17B) -- reliably emits tool calls
 GROUP_SIZE = 4 if SMOKE_TEST else 8        # GRPO group: rollouts/task; bigger = steadier gradient
 ITERATIONS = 2 if SMOKE_TEST else 30       # on-policy steps -- the actual learning loop
 LEARNING_RATE = 1e-5
@@ -62,9 +62,10 @@ TEMPERATURE = 1.0
 async def main() -> None:
     agent = create_agent(
         MODEL,
+        max_steps=25,                     # tool loop: get_providers + many get_patients + submit
         completion_kwargs={
             "temperature": TEMPERATURE,
-            "max_tokens": 1024,           # room to finish the JSON (it rambled+truncated before)
+            "max_tokens": 4096,           # brief thinking + tool calls
             "extra_body": {"return_token_ids": True},
         },
     )
