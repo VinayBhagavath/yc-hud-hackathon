@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useDashboard } from "@/lib/useDashboard";
 import { useReplay } from "@/lib/replay";
 import type { DashboardPayload } from "@/lib/types";
 import { API_BASE } from "@/lib/api";
 import { PALETTE } from "@/lib/palette";
 import UsMap, { type BaseRegion } from "@/components/UsMap";
+import AgentGraph from "@/components/AgentGraph";
 import KpiBar from "@/components/KpiBar";
 import RegionBreakdown from "@/components/RegionBreakdown";
 import PersonFeed from "@/components/PersonFeed";
@@ -33,9 +34,12 @@ export default function Page() {
   return <Dashboard data={load.data} />;
 }
 
+type CenterView = "map" | "graph";
+
 function Dashboard({ data }: { data: DashboardPayload }) {
   const replay = useReplay(data);
   const { state } = replay;
+  const [view, setView] = useState<CenterView>("map");
 
   const baseRegions = useMemo<BaseRegion[]>(() => {
     const panelByRegion = new Map(
@@ -63,17 +67,26 @@ function Dashboard({ data }: { data: DashboardPayload }) {
       <KpiBar state={state} evals={data.eval_summaries} />
 
       <div className="grid flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        {/* Center stage. */}
+        {/* Center stage — map or decision graph, sharing the scrubber. */}
         <div className="flex flex-col gap-4">
-          <div className="panel relative p-2 sm:p-4">
+          <div className="panel relative min-h-[420px] p-2 sm:p-4">
             <div className="pointer-events-none absolute left-5 top-4 z-10">
-              <span className="placard">Live allocation map</span>
+              <span className="placard">
+                {view === "map" ? "Live allocation map" : "Agent decision graph"}
+              </span>
               <p className="mt-1.5 text-[11px] text-faint">
-                Agent → physician zip · arc width ∝ dollars
+                {view === "map"
+                  ? "Agent → physician zip · arc width ∝ dollars"
+                  : "Agent → physicians → patients · edge ∝ dollars"}
               </p>
             </div>
-            <Legend />
-            <UsMap state={state} baseRegions={baseRegions} />
+            <ViewToggle view={view} onChange={setView} />
+            {view === "map" && <Legend />}
+            {view === "map" ? (
+              <UsMap state={state} baseRegions={baseRegions} />
+            ) : (
+              <AgentGraph state={state} />
+            )}
           </div>
           <ReplayControls replay={replay} />
         </div>
@@ -123,6 +136,34 @@ function Header({ total, undermedicated }: { total: number; undermedicated: numb
         Replaying production rounds
       </span>
     </header>
+  );
+}
+
+function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: CenterView;
+  onChange: (v: CenterView) => void;
+}) {
+  const opts: [CenterView, string][] = [
+    ["map", "Map"],
+    ["graph", "Graph"],
+  ];
+  return (
+    <div className="absolute right-4 top-4 z-10 flex items-center gap-0.5 rounded-full border border-hairline bg-canvas-2 p-0.5">
+      {opts.map(([v, label]) => (
+        <button
+          key={v}
+          onClick={() => onChange(v)}
+          className={`rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide transition ${
+            view === v ? "bg-gold text-canvas" : "text-muted hover:text-ink"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 
