@@ -1,16 +1,26 @@
-# Agent Sponsorship HUD
+# YC HUD Hackathon
 
-Read-only demo dashboard for the production-mode agent. It consumes Casey's Synthea-derived patient state and response-model outputs plus William's HUD training/eval exports, then renders the judge-facing dashboard as a single-page operator cockpit.
+This repo now contains both halves of the demo system:
 
-## Run
+- Provider allocation RL environment from `provider-allocation-rl`
+- Agent Sponsorship HUD dashboard/read layer on `main`
+
+The dashboard is the judge-facing control room. The provider allocation files are
+the current RL/training path and placeholder dynamics that Synthea can replace.
+
+## Dashboard
+
+The dashboard is a read-only FastAPI app plus a single-page frontend. It consumes
+Casey's Synthea-derived patient state and response-model outputs plus William's
+HUD training/eval exports, then renders the agent's production replay.
+
+Run it:
 
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
 Open `http://127.0.0.1:8000`.
-
-## Data Inputs
 
 The API uses fixture JSON by default. Swap in real exports with env vars:
 
@@ -27,7 +37,11 @@ DOSE_RESPONSE_JSON=/path/to/dose_response.json \
 uvicorn app.main:app --port 8000
 ```
 
-For Casey's production SQLite file, set `CASEY_SQLITE_PATH=/path/to/state.sqlite`. The API will read `patient_views` and `physician_views` tables with the columns from the expanded dashboard contract: patient age, diagnosis-to-treatment gap, status, physician specialty/region, panel size, dossier summary, saturation band, and cumulative sponsorship.
+For Casey's production SQLite file, set
+`CASEY_SQLITE_PATH=/path/to/state.sqlite`. The API reads `patient_views` and
+`physician_views` tables with the expanded dashboard contract: patient age,
+diagnosis-to-treatment gap, status, physician specialty/region, panel size,
+dossier summary, saturation band, and cumulative sponsorship.
 
 The playback fixture mirrors William's HUD loop:
 
@@ -37,9 +51,11 @@ The playback fixture mirrors William's HUD loop:
 - `end_round`
 - `resolve_round`
 
-Skipped patients can still convert organically in the simulated world, but `counted_in_reward` remains `false`; only funded allocations count toward cost-per-medicated.
+Skipped patients can still convert organically in the simulated world, but
+`counted_in_reward` remains `false`; only funded allocations count toward
+cost-per-medicated.
 
-## Endpoints
+Dashboard endpoints:
 
 - `GET /api/health`
 - `GET /api/patients`
@@ -50,8 +66,71 @@ Skipped patients can still convert organically in the simulated world, but `coun
 - `GET /api/overview`
 - `GET /api/dashboard`
 
-## Test
+Dashboard test:
 
 ```bash
-python3 -m unittest discover -s tests
+python3 -B -m unittest discover -s tests
 ```
+
+## Provider Allocation RL
+
+The RL environment trains an agent to allocate a budget across healthcare
+providers so as to maximize patient medication outcomes. Money goes to
+providers; patient outcomes determine the reward.
+
+Current problem shape:
+
+- The agent funds providers. Each provider serves a panel of patients.
+- An episode is 3 rounds.
+- Each round refreshes the budget.
+- Medicated patients are removed from later rounds.
+- Patient data shown to the agent contains no hidden threshold/cost info.
+
+Current reward source:
+
+The production medicate/do-not-medicate decision is intended to come from
+Synthea and Casey's response model. The current provider branch uses a
+deterministic placeholder in `dynamics.run_round` so the HUD pipeline can run
+and train today. The placeholder is the part Synthea replaces; see
+`<<< SYNTHEA SWAPS IN >>>` in `dynamics.py`.
+
+Provider files:
+
+| File | Purpose |
+|------|---------|
+| `dynamics.py` | Pure reward logic: cohort generation and per-round medication rule. |
+| `env.py` | HUD `Environment` plus `allocate` and `allocate_tool` task templates. |
+| `round_driver.py` | Workspace tool for the `allocate_tool` fallback path. |
+| `tasks.py` | Seed and budget sweep for taskset reward variance. |
+| `train.py` | GRPO training loop. |
+| `sanity_check.py` | Offline probe that reward is allocation-sensitive. |
+
+Provider run path:
+
+```bash
+pip install -r requirements.txt
+
+# Verify the reward has a gradient, no HUD/API needed:
+python sanity_check.py
+
+# Configure HUD:
+hud set HUD_API_KEY=...
+
+# Baseline eval:
+hud eval tasks.py claude
+
+# Train:
+hud models fork Qwen/Qwen3.5-4B --name payout-rl
+python train.py
+```
+
+## Notes
+
+- The dashboard models the final demo narrative: funded-only
+  cost-per-medicated reward, skipped organic conversions excluded from reward,
+  and a shrinking production pool.
+- The provider allocation RL branch currently exposes a provider-level
+  placeholder reward. Aligning `dynamics.py` with Casey's final funded-only
+  patient-level reward is the next integration step.
+- Hidden thresholds and authoritative round state should remain outside the
+  agent workspace.

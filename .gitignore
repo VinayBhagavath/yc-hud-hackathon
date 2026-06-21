@@ -6,3 +6,5 @@ venv/
 .DS_Store
 .env
 *.log
+*.egg-info/
+.hud/
