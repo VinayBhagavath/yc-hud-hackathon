@@ -1,5 +1,8 @@
 export function usd(value: number | null | undefined, opts?: { compact?: boolean }): string {
   if (value === null || value === undefined) return "—";
+  if (opts?.compact && Math.abs(value) >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`;
+  }
   if (opts?.compact && Math.abs(value) >= 1000) {
     return `$${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`;
   }

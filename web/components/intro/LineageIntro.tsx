@@ -8,8 +8,8 @@ import { num, usd } from "@/lib/format";
 
 // Stage coordinate system (a 1000×600 SVG, scaled responsively).
 const SW = 1000;
-const SH = 600;
-const AGENT = { x: 620, y: 300 };
+const SH = 560;
+const AGENT = { x: 500, y: 280 };
 
 // A gentle curve between two stage points, bowed slightly upward.
 function curve(ax: number, ay: number, bx: number, by: number): string {
@@ -77,15 +77,17 @@ export default function LineageIntro({
   const [beat, setBeat] = useState(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Representative geometry derived from the real payload.
+  // Representative geometry derived from the real payload. Patients cluster on
+  // the left, physicians mid-left, sponsors on the right — all converging into
+  // the agent dead-centre for a balanced, symmetric composition.
   const patients = useMemo(() => {
-    const n = Math.min(14, Math.max(6, data.overview.undermedicated));
+    const n = 18;
     return Array.from({ length: n }, (_, i) => {
       const col = i % 4;
       const row = Math.floor(i / 4);
-      return { x: 110 + col * 26, y: 210 + row * 30, key: i };
+      return { x: 96 + col * 24, y: 188 + row * 26, key: i };
     });
-  }, [data.overview.undermedicated]);
+  }, []);
 
   const physicians = useMemo(() => {
     const seen = new Map<string, { specialty: string; city: string }>();
@@ -94,15 +96,15 @@ export default function LineageIntro({
       if (seen.size >= 3) break;
     }
     const list = [...seen.values()];
-    const ys = [200, 300, 400];
-    return list.map((p, i) => ({ ...p, x: 360, y: ys[i] ?? 300, key: i }));
+    const ys = [200, 280, 360];
+    return list.map((p, i) => ({ ...p, x: 322, y: ys[i] ?? 280, key: i }));
   }, [data.physicians]);
 
   const sponsors = useMemo(
     () => [
-      { label: "Sponsor A", x: 880, y: 215 },
-      { label: "Sponsor B", x: 900, y: 300 },
-      { label: "Sponsor C", x: 880, y: 385 },
+      { label: "Sponsor A", x: 868, y: 205 },
+      { label: "Sponsor B", x: 884, y: 280 },
+      { label: "Sponsor C", x: 868, y: 355 },
     ],
     [],
   );
@@ -148,7 +150,7 @@ export default function LineageIntro({
       <span className="placard absolute left-6 top-6">Data lineage · origin story</span>
 
       <div className="relative w-full max-w-[1100px] px-6">
-        <svg viewBox={`0 0 ${SW} ${SH}`} width="100%" height="auto">
+        <svg viewBox={`0 0 ${SW} ${SH}`} style={{ width: "100%", height: "auto", display: "block" }}>
           {/* Patient → physician streams. */}
           {physicians.map((ph) =>
             patients

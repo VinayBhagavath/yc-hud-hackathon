@@ -35,7 +35,10 @@ interface NodeDatum {
 }
 
 function radiusFor(spend: number): number {
-  return 7 + Math.min(Math.sqrt(spend) * 0.72, 26);
+  // Small ambient dots when unfunded; grow with dollars. Tuned so ~90 metros
+  // read as a constellation rather than a clutter of fat circles.
+  if (spend <= 0) return 3.2;
+  return 5 + Math.min(Math.sqrt(spend) * 0.66, 24);
 }
 
 export default function UsMap({
@@ -93,7 +96,7 @@ export default function UsMap({
       : null;
 
   return (
-    <div className="relative">
+    <div className="relative w-full">
       <ComposableMap
         // d3 GeoProjection instance is accepted at runtime; its call overloads
         // just don't line up with react-simple-maps' ProjectionFunction type.

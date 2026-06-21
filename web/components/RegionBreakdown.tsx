@@ -12,12 +12,13 @@ export default function RegionBreakdown({ state }: { state: ReplayState }) {
     state.flows.length > 0 ? state.flows[state.flows.length - 1].region : null;
 
   return (
-    <section className="panel flex flex-col p-4">
+    <section className="panel flex min-h-0 flex-1 flex-col p-4">
       <Placard
-        title="Allocation by region"
-        subtitle="Dollars routed to each physician zip · emerald = converting"
+        title="Allocation by metro"
+        subtitle="Top metros by dollars routed · emerald = converting"
+        right={rows.length > 0 ? <span className="text-[11px] text-faint">{rows.length} active</span> : undefined}
       />
-      <div className="flex flex-col gap-2.5">
+      <div className="scroll-thin -mr-2 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-2">
         {rows.length === 0 && (
           <p className="py-6 text-center text-xs text-faint">
             Waiting for the agent to allocate…

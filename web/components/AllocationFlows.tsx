@@ -8,15 +8,19 @@ import { OUTCOME_COLOR, PALETTE } from "@/lib/palette";
 const COLORS = OUTCOME_COLOR;
 
 // How many of the most-recent flows stay "alive" (animated dashes + particle).
-const ACTIVE_WINDOW = 4;
+const ACTIVE_WINDOW = 5;
+// Cap rendered threads so hundreds of allocations stay smooth — older arcs are
+// already "remembered" by the grown region nodes underneath.
+const MAX_THREADS = 120;
 
 export default function AllocationFlows({ flows }: { flows: FlowItem[] }) {
   if (flows.length === 0) return null;
-  const newestIndex = flows.length - 1;
+  const shown = flows.length > MAX_THREADS ? flows.slice(flows.length - MAX_THREADS) : flows;
+  const newestIndex = shown.length - 1;
 
   return (
     <g>
-      {flows.map((flow, i) => {
+      {shown.map((flow, i) => {
         const dest = project(flow.lon, flow.lat);
         if (!dest) return null;
         const d = arcPath(TREASURY, dest);
