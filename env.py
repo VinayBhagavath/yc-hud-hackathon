@@ -1,99 +1,103 @@
 """HUD environment: fund providers to maximize patient medication uptake.
 
-HUD templates are strictly single-turn: `yield prompt` -> (agent acts) ->
-`yield reward`. Multi-step work happens in a WORKSPACE shell between those two
-yields (the documented pattern), NOT via extra yields.
+Trainable models (e.g. a forked Qwen) run under HUD's openai_compatible agent
+harness, which has NO bash/shell tool -- only filesystem + MCP. So this env is
+*tool-free*: the provider data is embedded in the prompt and the agent answers
+with its full multi-round funding plan as JSON text. That works with every model
+harness (Claude, Qwen, ...) and keeps the hidden cost-to-convert entirely
+server-side (no leak).
 
-So the 3-round episode is driven by the agent running `python apply_round.py` in
-its workspace once per round. Each round the budget refreshes, some patients get
-medicated, and medicated patients are removed (sticky). The reward is the final
-medicated fraction, read back from the workspace state.
+Decision: fund providers (not patients). A patient converts when the funding to
+their provider, split evenly across that provider's still-untreated patients,
+meets that patient's hidden cost-to-convert. Converted patients are removed from
+later rounds (sticky); the budget refreshes each round.
 
-  reward = total patients medicated / initial patient count   in [0, 1]
+  reward = total patients converted across all rounds / initial count   in [0, 1]
 
-Reward source: the per-round rule is a deterministic PLACEHOLDER (in
-apply_round.py / dynamics.run_round). Synthea replaces only that rule later.
+Reward source: Synthea diabetes cohort via synthea_cohort.make_cohort; the
+cost-to-convert rule is dynamics.run_round.
 """
 
 from __future__ import annotations
 
 import json
-import shutil
-import tempfile
-from pathlib import Path
+import re
 
 from hud import Environment
 
-# Real Synthea-backed cohort (Type 2 Diabetes / GLP-1). Same contract as
-# dynamics.make_cohort, so apply_round.py's rule is reused unchanged. To fall
-# back to the synthetic placeholder, swap this for `from dynamics import
-# make_cohort, public_view`.
+from dynamics import run_round
 from synthea_cohort import make_cohort, public_view
 
 env = Environment(name="provider-allocation", version="0.0.1")
 
-# A bash shell + filesystem the agent can read/write (the documented capability).
-# Fresh per rollout (each rollout runs in its own env process/container).
-WORKSPACE = Path(tempfile.mkdtemp(prefix="hud-provider-alloc-"))
-ws = env.workspace(WORKSPACE, network=False)
 
-_APPLY_SRC = Path(__file__).resolve().parent / "apply_round.py"
+def parse_plan(answer, rounds: int) -> dict[int, dict]:
+    """Pull a {round: {provider_id: amount}} plan out of the agent's text answer.
+
+    Tolerant of markdown fences / surrounding prose: grabs the outermost JSON
+    object. Accepts either {"round1": {...}, ...} or {"1": {...}, ...}. Returns
+    {round_index: {provider_id: amount}} for 0..rounds-1; missing rounds -> {}.
+    """
+    if not isinstance(answer, str):
+        return {}
+    m = re.search(r"\{.*\}", answer, re.DOTALL)
+    if not m:
+        return {}
+    try:
+        raw = json.loads(m.group(0))
+    except (ValueError, TypeError):
+        return {}
+
+    plan: dict[int, dict] = {}
+    for key, alloc in (raw.items() if isinstance(raw, dict) else []):
+        digits = re.search(r"\d+", str(key))
+        if not digits or not isinstance(alloc, dict):
+            continue
+        r = int(digits.group(0))
+        r = r - 1 if r >= 1 else r          # "round1"/"1" -> index 0
+        if 0 <= r < rounds:
+            out = {}
+            for pid, amt in alloc.items():
+                try:
+                    out[int(pid)] = max(0.0, float(amt))
+                except (ValueError, TypeError):
+                    continue
+            plan[r] = out
+    return plan
 
 
 @env.template()
-async def allocate(seed: int = 0, budget: float = 4000.0, rounds: int = 3):
+async def allocate(seed: int = 0, budget: float = 1500.0, rounds: int = 3):
     providers, thresholds = make_cohort(seed)
     n_total = len(thresholds)
-
-    # Hidden authoritative state (includes thresholds -- not shown to the agent).
-    state = {
-        "providers": providers,                       # id, region, patient ids
-        "thresholds": {str(k): v for k, v in thresholds.items()},
-        "unmedicated": sorted(thresholds),
-        "medicated": 0,
-        "round": 0,
-        "rounds": rounds,
-        "budget": budget,
-        "n_total": n_total,
-        "reward": 0.0,
-    }
-    (WORKSPACE / ".state.json").write_text(json.dumps(state))
-
-    # Public view: real observable features (region/city, volume, avg HbA1c) +
-    # remaining patient ids. NO cost info -- the $-to-convert is hidden.
-    (WORKSPACE / "patients.json").write_text(
-        json.dumps(public_view(providers, set(thresholds)), indent=2))
-
-    # Clear any stale files and drop the round driver in the workspace.
-    for f in ("alloc.json", "results.json"):
-        (WORKSPACE / f).unlink(missing_ok=True)
-    shutil.copy(_APPLY_SRC, WORKSPACE / "apply_round.py")
+    view = public_view(providers, set(thresholds))   # features only, NO costs
 
     answer = yield (
         f"You direct a patient-access program for a branded GLP-1 diabetes therapy. "
-        f"You have a bash shell and ${budget:.0f} of outreach funding to allocate across "
-        f"healthcare providers in EACH of {rounds} rounds (the budget refreshes every "
-        f"round). Goal: get as many undertreated Type 2 Diabetes patients onto therapy "
-        f"('medicated') as possible across all rounds.\n\n"
-        f"`patients.json` lists providers, each with real observable features -- `region` "
-        f"(city), `volume` (provider patient volume), `avg_hba1c` (panel severity) -- and "
-        f"the ids of patients still untreated. A patient is converted when the funding you "
-        f"give their provider, split evenly across that provider's listed patients, meets "
-        f"that patient's (hidden) cost-to-convert. Converted patients stay on therapy and "
-        f"are removed from later rounds. Cost-to-convert is NOT shown, but it correlates "
-        f"with region -- infer cost-effectiveness from the observable features and decide "
-        f"from patients.json (no need to inspect other files).\n\n"
-        f"Use ONLY the bash tool. Each round:\n"
-        f"  1. read patients.json   (e.g. `cat patients.json`)\n"
-        f"  2. apply your funding by running, in one bash command:\n"
-        f"       python apply_round.py '{{\"<provider_id>\": <amount>, ...}}'\n"
-        f"     (total <= ${budget:.0f}; it reports results and refreshes patients.json)\n"
-        f"Do NOT use a file-editor tool and do not create files. Repeat for all "
-        f"{rounds} rounds, then reply 'done'."
+        f"Allocate ${budget:.0f} of outreach funding across healthcare providers in EACH "
+        f"of {rounds} rounds (the budget refreshes every round) to get as many "
+        f"undertreated Type 2 Diabetes patients onto therapy as possible.\n\n"
+        f"Providers (JSON) -- each has a `region` (city), `volume`, `avg_hba1c`, and the "
+        f"ids of patients still untreated:\n{json.dumps(view)}\n\n"
+        f"A patient converts when the funding you give their provider, split evenly across "
+        f"that provider's still-untreated patients, meets that patient's hidden "
+        f"cost-to-convert (NOT shown; it correlates with region). Converted patients stay "
+        f"on therapy and are removed from later rounds. Plan all {rounds} rounds up front, "
+        f"spending each round's budget where it converts the most patients.\n\n"
+        f"Respond with ONLY a JSON object mapping each round to provider funding, e.g.:\n"
+        f'{{"round1": {{"0": 800, "3": 700}}, "round2": {{"1": 1500}}, "round3": {{"2": 900}}}}\n'
+        f"Each round's total must be <= ${budget:.0f}."
     )
 
-    try:
-        final = json.loads((WORKSPACE / ".state.json").read_text())
-        yield float(final.get("reward", 0.0))
-    except Exception:  # noqa: BLE001
-        yield 0.0
+    plan = parse_plan(answer, rounds)
+    unmedicated = set(thresholds)
+    medicated = 0
+    for r in range(rounds):
+        alloc = plan.get(r, {})
+        if sum(alloc.values()) > budget:        # over budget -> wasted round
+            continue
+        newly = run_round(providers, unmedicated, thresholds, alloc)
+        unmedicated -= newly
+        medicated += len(newly)
+
+    yield medicated / n_total if n_total else 0.0
