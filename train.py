@@ -29,7 +29,7 @@ import asyncio
 import logging
 import os
 
-from hud import Job, TrainingClient, LocalRuntime, HUDRuntime
+from hud import Job, TrainingClient, LocalRuntime  # , HUDRuntime
 from hud.agents import create_agent
 
 import tasks
@@ -54,10 +54,6 @@ LEARNING_RATE = 1e-5
 MAX_CONCURRENT = 8
 ROLLOUT_TIMEOUT = 300.0  # per-rollout wall-clock cap (s) so one stuck rollout can't wedge the batch
 
-# RUNTIME=hud runs the ENV on HUD infra too (needs `hud deploy` first); default
-# runs the env locally (the orchestration loop is local either way).
-USE_HUD_RUNTIME = os.environ.get("RUNTIME", "local").lower() == "hud"
-
 # Sampling temperature is REQUIRED for GRPO: rollouts in a group must differ, or
 # advantage (reward - group_mean) is ~0 and nothing is learned. Keep it > 0.
 TEMPERATURE = 1.0
@@ -74,15 +70,13 @@ async def main() -> None:
     )
     trainer = TrainingClient(MODEL)
 
-    # Model sampling + GRPO weight updates always run on HUD. The env runs on HUD
-    # too with RUNTIME=hud (after `hud deploy`), else locally. The orchestration
-    # loop itself is local regardless.
-    runtime = HUDRuntime() if USE_HUD_RUNTIME else LocalRuntime("env.py")
+    # Env runs locally; HUD does the model sampling + GRPO weight updates.
+    runtime = LocalRuntime("env.py")
 
     n_tasks = len(tasks.taskset.tasks)
-    print(f"[train] model={MODEL} runtime={'HUD' if USE_HUD_RUNTIME else 'local'} "
-          f"tasks={n_tasks} group={GROUP_SIZE} iterations={ITERATIONS} -> "
-          f"~{n_tasks * GROUP_SIZE} rollouts/iter at {MAX_CONCURRENT}-wide.", flush=True)
+    print(f"[train] model={MODEL} tasks={n_tasks} group={GROUP_SIZE} "
+          f"iterations={ITERATIONS} -> ~{n_tasks * GROUP_SIZE} rollouts/iter "
+          f"at {MAX_CONCURRENT}-wide.", flush=True)
 
     session = await Job.start(MODEL, group=GROUP_SIZE)
     print(f"[train] job started: {session.id}  (watch live: https://hud.ai/jobs)", flush=True)
