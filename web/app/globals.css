@@ -3,10 +3,17 @@
 @tailwind utilities;
 
 :root {
-  /* Offline-safe font stacks (no network font fetch). */
+  /* next/font injects --font-serif / --font-sans / --font-mono on <body>.
+     These are offline-safe fallbacks if the fonts fail to load. */
+  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+
+  --canvas: #15120c;
+  --ink: #ece3d1;
+  --hairline: #3a3122;
+  --gold: #c9a35b;
 }
 
 html,
@@ -15,13 +22,41 @@ body {
 }
 
 body {
-  background-color: #0a0b0f;
+  position: relative;
+  background-color: var(--canvas);
+  /* Soft gallery-light vignette — a painting lit from above, never busy. */
   background-image:
-    radial-gradient(1200px 600px at 50% -10%, rgba(52, 211, 153, 0.06), transparent 70%),
-    radial-gradient(900px 500px at 100% 0%, rgba(80, 120, 255, 0.05), transparent 70%);
-  color: #e8ecf4;
+    radial-gradient(1100px 620px at 50% -8%, rgba(201, 163, 91, 0.07), transparent 70%),
+    radial-gradient(1400px 900px at 50% 120%, rgba(0, 0, 0, 0.55), transparent 60%),
+    radial-gradient(900px 700px at 50% 40%, rgba(40, 33, 22, 0.35), transparent 75%);
+  color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tiling paper/canvas grain — a tiny SVG turbulence tile, kept barely-there so it
+   reads as primed canvas under glass, not noise. Fixed so it doesn't scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Keep all real content above the grain layer. */
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
 }
 
 .tabular {
@@ -29,34 +64,72 @@ body {
   font-family: var(--font-mono);
 }
 
-/* Thin, dark scrollbars for the feed panels. */
+/* Big engraved-plaque metrics: serif with tabular figures. */
+.metric-serif {
+  font-family: var(--font-serif);
+  font-feature-settings: "tnum" 1, "ss01" 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Thin, warm scrollbars for the feed panels. */
 .scroll-thin::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: #222634;
+  background: #4a3f2c;
   border-radius: 999px;
 }
 .scroll-thin::-webkit-scrollbar-track {
   background: transparent;
 }
 
+/* Framed canvas card: warm hairline, soft long shadow, inner top highlight. */
 .panel {
-  background: linear-gradient(180deg, #12141d 0%, #0e1016 100%);
-  border: 1px solid #1c2030;
-  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(236, 227, 209, 0.018), transparent 40%),
+    linear-gradient(180deg, #221d15 0%, #1b1710 100%);
+  border: 1px solid var(--hairline);
+  border-radius: 13px;
   box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
-    0 8px 40px -16px rgba(0, 0, 0, 0.8);
+    inset 0 1px 0 0 rgba(236, 227, 209, 0.06),
+    0 18px 50px -24px rgba(0, 0, 0, 0.85);
 }
 
 .hairline {
-  border-color: #1c2030;
+  border-color: var(--hairline);
+}
+
+/* Museum placard: quiet small-caps section label with a gold tick. */
+.placard {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink);
+}
+.placard::before {
+  content: "";
+  width: 14px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--gold), transparent);
+}
+
+/* One-shot ink-bleed reveal for panels on mount. */
+.ink-bleed {
+  animation: ink-bleed 0.7s ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .flow-anim {
+  .flow-anim,
+  .ink-bleed {
     animation: none !important;
+  }
+  body::before {
+    opacity: 0.04;
   }
 }
