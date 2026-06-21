@@ -16,10 +16,10 @@ SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 if SMOKE_TEST:
     SEEDS = range(20)              # 20 tasks (20x the original 1-task smoke run)
-    BUDGETS = (2500.0,)           # binds hard -> real reward variance ($6000 saturated)
+    BUDGETS = (1500.0,)           # tight -> max learning headroom (naive 0.16, ceiling 0.75)
 else:
     SEEDS = range(60)
-    BUDGETS = (1800.0, 2500.0, 3500.0)  # non-saturating range for GRPO variance
+    BUDGETS = (1200.0, 1500.0, 2000.0)  # tight, non-saturating range for GRPO variance
 
 # Expose exactly ONE taskset. Exposing both a loose list and a Taskset makes
 # HUD's module loader discover the same tasks twice -> "duplicate task slugs".
