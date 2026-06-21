@@ -329,7 +329,7 @@ function ModelMap({
         className="absolute right-2 top-2 max-h-[92%] w-[230px] overflow-auto rounded-lg border border-hairline bg-canvas-2/90 p-2.5 text-[11px] backdrop-blur"
         style={{ pointerEvents: "auto" }}
       >
-        <div className="mb-1.5 font-medium text-default">
+        <div className="mb-1.5 font-medium text-ink">
           Model ranking · ${state.spend.toFixed(0)} → {state.medicatedCount} on therapy
         </div>
         {ranking.map((r) => (
