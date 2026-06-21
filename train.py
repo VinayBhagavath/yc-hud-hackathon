@@ -49,9 +49,9 @@ MODEL = "payout-rl"
 GROUP_SIZE = 4 if SMOKE_TEST else 8
 ITERATIONS = 2 if SMOKE_TEST else 20
 LEARNING_RATE = 1e-5
-# Cap concurrent rollouts -- unbounded gather opens too many sockets/processes
-# and hits the OS file-descriptor limit (Errno 24: Too many open files).
-MAX_CONCURRENT = 4
+# Cap concurrent rollouts -- unbounded gather hits the OS file-descriptor limit
+# AND can saturate the Tinker training backend (503 "no healthy keys"). Keep low.
+MAX_CONCURRENT = 2
 ROLLOUT_TIMEOUT = 300.0  # per-rollout wall-clock cap (s) so one stuck rollout can't wedge the batch
 
 # Sampling temperature is REQUIRED for GRPO: rollouts in a group must differ, or

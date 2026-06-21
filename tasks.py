@@ -15,7 +15,7 @@ from env import allocate
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 if SMOKE_TEST:
-    SEEDS = range(20)              # 20 tasks (20x the original 1-task smoke run)
+    SEEDS = range(6)              # 6 tasks x group 4 = 24 rollouts/iter (gentle on Tinker)
     BUDGETS = (1500.0,)           # tight -> max learning headroom (naive 0.16, ceiling 0.75)
 else:
     SEEDS = range(60)
