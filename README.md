@@ -115,14 +115,26 @@ Provider files:
 
 | File | Purpose |
 |------|---------|
-| `dynamics.py` | Pure reward logic: cohort generation and per-round medication rule. |
-| `env.py` | HUD `Environment` plus `allocate` and `allocate_tool` task templates. |
-| `round_driver.py` | Workspace tool for the `allocate_tool` fallback path. |
-| `tasks.py` | Seed and budget sweep for taskset reward variance. |
+| `dynamics.py` | Pure reward logic (cohort gen placeholder + per-round medication rule). No HUD dep. |
+| `synthea_cohort.py` | Real Synthea diabetes cohort (`make_cohort`/`public_view`); the live data source. |
+| `cohort_data.json` | Committed ~15KB cohort snapshot so the env runs with zero setup. |
+| `env.py` | HUD `Environment` + the tool-free `allocate` task template. |
+| `tasks.py` | Seed × budget sweep → `taskset`. |
 | `train.py` | GRPO training loop. |
-| `sanity_check.py` | Offline probe that reward is allocation-sensitive. |
+| `sanity_check.py` | Offline probe: confirms reward is allocation-sensitive (no HUD needed). |
+| `Dockerfile.hud` / `pyproject.toml` | Packaging for `hud deploy`. |
 
-Provider run path:
+## How the 3 rounds work (tool-free)
+
+Trainable models (e.g. a forked Qwen) run under HUD's `openai_compatible` agent
+harness, which has **no bash/shell tool** — so the env uses **no tools at all**.
+Provider data is embedded in the prompt (`public_view`, costs hidden) and the
+agent answers with its full plan as JSON: `{"round1": {"<provider>": amount}, ...}`.
+The template parses it and simulates all `rounds` rounds server-side
+(sticky removal + budget refresh) to compute the reward. This works with any
+model harness and keeps the hidden cost-to-convert entirely server-side.
+
+## Run it
 
 ```bash
 pip install -r requirements.txt

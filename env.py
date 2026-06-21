@@ -1,121 +1,127 @@
 """HUD environment: fund providers to maximize patient medication uptake.
 
-Decision flow
--------------
-The policy agent allocates a fixed budget across *providers* (not patients).
-Each provider serves a panel of patients. Whether a patient ends up medicated
-is decided by a reward function that, in production, will be **Synthea**
-(synthetic patient generation with transition-modeled provider preferences).
+Trainable models (e.g. a forked Qwen) run under HUD's openai_compatible agent
+harness, which has NO bash/shell tool -- only filesystem + MCP. So this env is
+*tool-free*: the provider data is embedded in the prompt and the agent answers
+with its full multi-round funding plan as JSON text. That works with every model
+harness (Claude, Qwen, ...) and keeps the hidden cost-to-convert entirely
+server-side (no leak).
 
-Until Synthea is wired in, the reward dynamics in dynamics.py use a
-deterministic PLACEHOLDER rule so the full pipeline (episode loop, budget
-refresh, training) runs end-to-end with a learnable, allocation-sensitive
-reward.
+Decision: fund providers (not patients). A patient converts when the funding to
+their provider, split evenly across that provider's still-untreated patients,
+meets that patient's hidden cost-to-convert. Converted patients are removed from
+later rounds (sticky); the budget refreshes each round.
 
-Episode structure (3 rounds)
-----------------------------
-Per episode the agent allocates ``rounds`` (=3) times. Each round:
-  1. the budget is fully refreshed to ``budget``,
-  2. the agent funds providers,
-  3. some currently-unmedicated patients become medicated,
-  4. medicated patients are REMOVED for subsequent rounds (sticky).
-Final reward = (total patients medicated across all rounds) / (initial count),
-already in [0, 1] -- no oracle/normalization needed.
+  reward = total patients converted across all rounds / initial count   in [0, 1]
 
-Two ways to drive the 3 rounds:
-  * ``allocate``      -- multi-turn generator (cleanest). Relies on HUD driving
-                         templates as true multi-turn generators. VERIFY against
-                         the live HUD docs skill before depending on it.
-  * ``allocate_tool`` -- single-prompt + workspace round-driver tool (safe
-                         fallback matching the documented "deliverable is
-                         workspace state + tools" pattern). See round_driver.py.
+Reward source: Synthea diabetes cohort via synthea_cohort.make_cohort; the
+cost-to-convert rule is dynamics.run_round.
 """
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
+import re
 
 from hud import Environment
 
-from dynamics import make_cohort, run_round, parse_alloc, public_view
+from dynamics import run_round
+from synthea_cohort import make_cohort, public_view
 
 env = Environment(name="provider-allocation", version="0.0.1")
 
-# Workspace the agent reads/writes. Authoritative reward state (hidden
-# thresholds, medicated set, round logic) lives OUTSIDE it so the agent cannot
-# tamper with its own reward.
-ROOT = Path("/workspace")
+
+def _balanced_objects(s: str) -> list[str]:
+    """Return every top-level {...} balanced substring, in order of appearance."""
+    objs, depth, start = [], 0, None
+    for i, ch in enumerate(s):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}" and depth > 0:
+            depth -= 1
+            if depth == 0 and start is not None:
+                objs.append(s[start:i + 1])
+                start = None
+    return objs
 
 
-# --------------------------------------------------------------------------- #
-# Multi-turn generator template (cleanest; verify multi-turn support)
-# --------------------------------------------------------------------------- #
+def _coerce_plan(raw, rounds: int) -> dict[int, dict]:
+    plan: dict[int, dict] = {}
+    for key, alloc in (raw.items() if isinstance(raw, dict) else []):
+        digits = re.search(r"\d+", str(key))
+        if not digits or not isinstance(alloc, dict):
+            continue
+        r = int(digits.group(0))
+        r = r - 1 if r >= 1 else r          # "round1"/"1" -> index 0
+        if 0 <= r < rounds:
+            out = {}
+            for pid, amt in alloc.items():
+                try:
+                    out[int(pid)] = max(0.0, float(amt))
+                except (ValueError, TypeError):
+                    continue
+            plan[r] = out
+    return plan
+
+
+def parse_plan(answer, rounds: int) -> dict[int, dict]:
+    """Pull a {round: {provider_id: amount}} plan out of the agent's text answer.
+
+    Models (esp. small ones) ramble and echo the example before the real plan,
+    so we scan ALL balanced {...} objects and take the LAST one that parses to a
+    valid plan -- skipping prose and the example (which often contains a literal
+    ``...`` that fails json.loads).
+    """
+    if not isinstance(answer, str):
+        return {}
+    for cand in reversed(_balanced_objects(answer)):
+        try:
+            raw = json.loads(cand)
+        except (ValueError, TypeError):
+            continue
+        plan = _coerce_plan(raw, rounds)
+        if plan:
+            return plan
+    return {}
+
+
 @env.template()
-async def allocate(seed: int = 0, budget: float = 4000.0, rounds: int = 3):
+async def allocate(seed: int = 0, budget: float = 1500.0, rounds: int = 3):
     providers, thresholds = make_cohort(seed)
     n_total = len(thresholds)
+    view = public_view(providers, set(thresholds))   # features only, NO costs
+
+    answer = yield (
+        f"You direct a patient-access program for a branded GLP-1 diabetes therapy. "
+        f"Allocate ${budget:.0f} of outreach funding across healthcare providers in EACH "
+        f"of {rounds} rounds (the budget refreshes every round) to get as many "
+        f"undertreated Type 2 Diabetes patients onto therapy as possible.\n\n"
+        f"Providers (JSON) -- each has a `region` (city), `volume`, `avg_hba1c`, and the "
+        f"ids of patients still untreated:\n{json.dumps(view)}\n\n"
+        f"A patient converts when the funding you give their provider, split evenly across "
+        f"that provider's still-untreated patients, meets that patient's hidden "
+        f"cost-to-convert (NOT shown; it correlates with region). Converted patients stay "
+        f"on therapy and are removed from later rounds. Plan all {rounds} rounds up front, "
+        f"spending each round's budget where it converts the most patients.\n\n"
+        f"Output ONLY a single JSON object and nothing else -- no reasoning, no explanation, "
+        f"no markdown, starting with '{{'. Use the ACTUAL provider ids from the data above "
+        f"and dollar amounts YOU choose; each round's total must be <= ${budget:.0f}. Shape "
+        f"(placeholders -- fill in real ids/amounts, do not copy):\n"
+        f'{{"round1": {{"<provider_id>": <dollars>, ...}}, "round2": {{...}}, "round3": {{...}}}}\n'
+        f"/no_think"   # Qwen switch: answer directly instead of emitting a <think> ramble
+    )
+
+    plan = parse_plan(answer, rounds)
     unmedicated = set(thresholds)
     medicated = 0
-
     for r in range(rounds):
-        ROOT.mkdir(parents=True, exist_ok=True)
-        (ROOT / "patients.json").write_text(
-            json.dumps(public_view(providers, unmedicated), indent=2)
-        )
-        answer = yield (
-            f"Round {r + 1}/{rounds}. Budget ${budget:.0f} (fully refreshed this round). "
-            f"{len(unmedicated)} patients still need medication; provider panels are in "
-            f"/workspace/patients.json. Decide how much to fund each provider and write it "
-            f'to /workspace/alloc.json as {{"<provider_id>": <amount>}}. Total must not '
-            f"exceed the budget. Patients you medicate stay medicated; aim to medicate as "
-            f"many patients as possible across all {rounds} rounds."
-        )
-        alloc = parse_alloc(answer)
-        if sum(alloc.values()) > budget:
-            continue  # over budget -> wasted round
+        alloc = plan.get(r, {})
+        if sum(alloc.values()) > budget:        # over budget -> wasted round
+            continue
         newly = run_round(providers, unmedicated, thresholds, alloc)
         unmedicated -= newly
         medicated += len(newly)
 
     yield medicated / n_total if n_total else 0.0
-
-
-# --------------------------------------------------------------------------- #
-# Single-prompt + workspace round-driver fallback
-# --------------------------------------------------------------------------- #
-@env.template()
-async def allocate_tool(seed: int = 0, budget: float = 4000.0, rounds: int = 3):
-    """Single-turn variant: the agent runs `python /authoritative/round_driver.py`
-    after each write to /workspace/alloc.json. The driver applies the round,
-    refreshes the budget, removes medicated patients, and updates
-    /workspace/patients.json and /workspace/state.json. Final reward is read back
-    from state.json. Authoritative state lives under /authoritative.
-    """
-    providers, thresholds = make_cohort(seed)
-    n_total = len(thresholds)
-
-    ROOT.mkdir(parents=True, exist_ok=True)
-    auth = Path("/authoritative")
-    auth.mkdir(parents=True, exist_ok=True)
-    (auth / "thresholds.json").write_text(json.dumps(thresholds))
-    (auth / "providers.json").write_text(json.dumps(providers))
-    (auth / "config.json").write_text(
-        json.dumps({"budget": budget, "rounds": rounds, "round": 0,
-                    "medicated": [], "n_total": n_total})
-    )
-    (ROOT / "patients.json").write_text(
-        json.dumps(public_view(providers, set(thresholds)), indent=2)
-    )
-
-    yield (
-        f"You have {rounds} funding rounds. Each round: read /workspace/patients.json, "
-        f"write your provider funding to /workspace/alloc.json as "
-        f'{{"<provider_id>": <amount>}} (total <= ${budget:.0f}, refreshed every round), '
-        f"then run `python /authoritative/round_driver.py` to apply it. Repeat until all "
-        f"{rounds} rounds are used. Maximize total patients medicated; medicated patients "
-        f"stay medicated and are removed from later rounds."
-    )
-
-    state = json.loads((ROOT / "state.json").read_text())
-    yield state.get("reward", 0.0)

@@ -26,20 +26,33 @@ against the HUD docs skill before a long run.
 """
 
 import asyncio
+import logging
 import os
 
-from hud import Job, TrainingClient, HUDRuntime  # , LocalRuntime
+from hud import Job, TrainingClient, LocalRuntime  # , HUDRuntime
 from hud.agents import create_agent
 
 import tasks
 
+# Surface HUD's INFO logs (e.g. "running N rollouts (... x group)") so the run
+# isn't silent while iteration 0 churns through rollouts before the first print.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# ...but silence the per-HTTP-request flood from these libraries (one line per
+# rollout step otherwise) so the [train] progress lines stay readable.
+for _noisy in ("httpx", "httpcore", "openai", "asyncssh", "websockets", "urllib3"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+
 # Set SMOKE_TEST=1 for a tiny, cheap run (also shrinks the taskset in tasks.py).
 SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
-MODEL = "payout-rl"
+MODEL = "payout-rl-q8b"   # 4B was too weak to emit JSON (rambled); 8B follows the format
 GROUP_SIZE = 4 if SMOKE_TEST else 8
 ITERATIONS = 2 if SMOKE_TEST else 20
 LEARNING_RATE = 1e-5
+# Cap concurrent rollouts -- unbounded gather hits the OS file-descriptor limit
+# AND can saturate the Tinker training backend (503 "no healthy keys"). Keep low.
+MAX_CONCURRENT = 2
+ROLLOUT_TIMEOUT = 300.0  # per-rollout wall-clock cap (s) so one stuck rollout can't wedge the batch
 
 # Sampling temperature is REQUIRED for GRPO: rollouts in a group must differ, or
 # advantage (reward - group_mean) is ~0 and nothing is learned. Keep it > 0.
@@ -51,25 +64,45 @@ async def main() -> None:
         MODEL,
         completion_kwargs={
             "temperature": TEMPERATURE,
+            "max_tokens": 1024,           # room to finish the JSON (it rambled+truncated before)
             "extra_body": {"return_token_ids": True},
         },
     )
     trainer = TrainingClient(MODEL)
 
-    # Cloud rollouts on HUD infra (this is the "train through HUD" path).
-    # Requires `hud deploy` first. For local iteration instead, use:
-    #   runtime = LocalRuntime("env.py")
-    runtime = HUDRuntime()
+    # Rollouts serve the env LOCALLY (same path as `hud eval`); the model is
+    # still sampled through the HUD gateway and weight updates run on HUD via
+    # TrainingClient. Swap to HUDRuntime() to run the env on HUD infra too
+    # (needs `hud deploy` first).
+    runtime = LocalRuntime("env.py")
+
+    n_tasks = len(tasks.taskset.tasks)
+    print(f"[train] model={MODEL} tasks={n_tasks} group={GROUP_SIZE} "
+          f"iterations={ITERATIONS} -> ~{n_tasks * GROUP_SIZE} rollouts/iter "
+          f"at {MAX_CONCURRENT}-wide. First 'iter 0' prints after iteration 0 "
+          f"finishes (can take several minutes).", flush=True)
 
     session = await Job.start(MODEL, group=GROUP_SIZE)
+    print(f"[train] job started: {session.id}  (watch live: https://hud.ai/jobs)", flush=True)
+
     for it in range(ITERATIONS):
         start = len(session.runs)
-        await tasks.taskset.run(agent, runtime=runtime, job=session)
+        print(f"[train] iter {it}: running rollouts...", flush=True)
+        await tasks.taskset.run(
+            agent, runtime=runtime, job=session,
+            max_concurrent=MAX_CONCURRENT, rollout_timeout=ROLLOUT_TIMEOUT,
+        )
         batch = session.runs[start:]
+        rewards = [r.reward for r in batch if getattr(r, "reward", None) is not None]
+        errors = sum(1 for r in batch if getattr(r, "error", None))
+        mean = sum(rewards) / len(rewards) if rewards else 0.0
+        spread = (max(rewards) - min(rewards)) if rewards else 0.0
+        print(f"[train] iter {it}: {len(batch)} rollouts, {errors} errors, "
+              f"reward mean={mean:.3f} spread={spread:.3f} -> training step...", flush=True)
         metrics = await trainer.step(
             batch, learning_rate=LEARNING_RATE, group_size=GROUP_SIZE
         )
-        print(f"iter {it}: {metrics}")
+        print(f"[train] iter {it} DONE: {metrics}", flush=True)
 
 
 if __name__ == "__main__":
