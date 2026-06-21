@@ -36,12 +36,33 @@ def concentrate(providers, unmedicated, budget):
     return {target: budget}
 
 
+def region_aware(providers, unmedicated, budget):
+    """Prioritize cheap regions (N > S > E), funding each provider just enough to
+    cover its remaining patients. This is the signal the agent can learn from the
+    visible `region` feature -- it should beat the region-blind policies."""
+    rank = {"N": 0, "S": 1, "E": 2}
+    per_patient = {"N": 120, "S": 300, "E": 700}  # enough to clear that region
+    order = sorted(providers, key=lambda p: rank[p["region"]])
+    alloc, left = {}, budget
+    for p in order:
+        active = sum(1 for q in p["patients"] if q in unmedicated)
+        if not active:
+            continue
+        need = active * per_patient[p["region"]]
+        give = min(need, left)
+        if give > 0:
+            alloc[p["id"]] = give
+            left -= give
+    return alloc
+
+
 def none(providers, unmedicated, budget):
     return {}
 
 
 if __name__ == "__main__":
-    policies = {"none": none, "even": even, "concentrate": concentrate}
+    policies = {"none": none, "even": even, "concentrate": concentrate,
+                "region_aware": region_aware}
     for budget in (1000, 3000, 6000, 12000):
         row = {name: round(
             sum(simulate(s, budget, fn) for s in range(20)) / 20, 3

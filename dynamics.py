@@ -14,27 +14,38 @@ import random
 N_PROVIDERS = 5
 PANEL = 8  # patients per provider
 
+# PLACEHOLDER cost-effectiveness, correlated with the VISIBLE `region` feature so
+# the agent has a learnable signal: patients at "N" providers medicate cheaply,
+# "E" providers are expensive. The agent sees region (not thresholds), so a good
+# policy learns to prioritise cheap regions. Synthea replaces this with real
+# preference dynamics; until then this gives a demo a visible learning curve.
+REGION_THRESHOLDS = {
+    "N": [80, 120],     # cheap region -- best ROI
+    "S": [200, 300],    # mid
+    "E": [500, 700],    # expensive region -- worst ROI
+}
+
 
 def make_cohort(seed: int, n_providers: int = N_PROVIDERS, panel: int = PANEL):
     """Return (providers_public, thresholds_hidden).
 
     ``providers_public`` is all the agent sees: provider id, region, patient ids
-    -- deliberately NO cost/threshold info. ``thresholds_hidden`` maps
-    patient_id -> the per-patient funding share required to medicate (the
+    -- deliberately NO cost/threshold info, but ``region`` is correlated with
+    cost (see REGION_THRESHOLDS), so it's a learnable feature. ``thresholds_hidden``
+    maps patient_id -> the per-patient funding share required to medicate (the
     PLACEHOLDER stand-in for Synthea; never shown to the agent).
     """
     rng = random.Random(seed)
     providers, thresholds = [], {}
     pid = 0
     for j in range(n_providers):
+        region = rng.choice(list(REGION_THRESHOLDS))
         patient_ids = []
         for _ in range(panel):
-            thresholds[pid] = rng.choice([100, 250, 600])  # PLACEHOLDER for Synthea
+            thresholds[pid] = rng.choice(REGION_THRESHOLDS[region])  # PLACEHOLDER
             patient_ids.append(pid)
             pid += 1
-        providers.append(
-            {"id": j, "region": rng.choice(["N", "S", "E"]), "patients": patient_ids}
-        )
+        providers.append({"id": j, "region": region, "patients": patient_ids})
     return providers, thresholds
 
 
