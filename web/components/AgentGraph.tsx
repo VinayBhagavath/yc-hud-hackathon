@@ -55,8 +55,8 @@ interface GLink {
 }
 
 function physRadius(n: GNode): number {
-  if (!n.funded) return 2.6;
-  return 5 + Math.min(Math.sqrt(n.dollars) * 0.34, 11);
+  if (!n.funded) return 2.2;
+  return 4 + Math.min(Math.sqrt(n.dollars) * 0.26, 8);
 }
 function nodeRadius(n: GNode): number {
   if (n.kind === "agent") return 16;
@@ -177,10 +177,10 @@ export default function AgentGraph({
     let sim = simRef.current;
     if (!sim) {
       sim = forceSimulation<GNode, GLink>()
-        .force("charge", forceManyBody<GNode>().strength((n) => ((n as GNode).kind === "physician" ? -34 : -10)))
-        .force("radial", forceRadial<GNode>((n) => (n.kind === "physician" ? 210 : n.kind === "patient" ? 250 : 0), CX, CY).strength((n) => (n.kind === "physician" ? 0.55 : 0.04)))
-        .force("collide", forceCollide<GNode>((n) => nodeRadius(n) + 1.5))
-        .force("link", forceLink<GNode, GLink>().id((n) => n.id).distance((l) => (l.kind === "fund" ? 150 : 16)).strength((l) => (l.kind === "fund" ? 0.04 : 0.7)));
+        .force("charge", forceManyBody<GNode>().strength((n) => ((n as GNode).kind === "physician" ? -42 : -12)))
+        .force("radial", forceRadial<GNode>((n) => (n.kind === "physician" ? 220 : n.kind === "patient" ? 262 : 0), CX, CY).strength((n) => (n.kind === "physician" ? 0.6 : 0.04)))
+        .force("collide", forceCollide<GNode>((n) => nodeRadius(n) + 2.5))
+        .force("link", forceLink<GNode, GLink>().id((n) => n.id).distance((l) => (l.kind === "fund" ? 160 : 15)).strength((l) => (l.kind === "fund" ? 0.03 : 0.65)));
       simRef.current = sim;
     }
     sim.nodes(nodes);
@@ -214,14 +214,6 @@ export default function AgentGraph({
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const resolve = (e: string | GNode): GNode | undefined => (typeof e === "string" ? byId.get(e) : e);
 
-  // Label only the biggest few funded physicians.
-  const labelled = new Set(
-    [...nodes]
-      .filter((n) => n.kind === "physician" && n.funded)
-      .sort((a, b) => b.dollars - a.dollars)
-      .slice(0, 7)
-      .map((n) => n.id),
-  );
   const fundedPhys = nodes.filter((n) => n.kind === "physician" && n.funded).length;
   const patientCount = nodes.filter((n) => n.kind === "patient").length;
 
@@ -238,7 +230,7 @@ export default function AgentGraph({
           const t = resolve(l.target);
           if (!s || !t) return null;
           const stroke = l.kind === "fund" ? PALETTE.gold : OUTCOME_COLOR[(t.outcome as string) ?? ""] ?? PALETTE.slate;
-          const w = l.kind === "fund" ? Math.max(0.6, Math.min(Math.sqrt(l.value) * 0.12, 2.6)) : 0.6;
+          const w = l.kind === "fund" ? Math.max(0.5, Math.min(Math.sqrt(l.value) * 0.09, 1.8)) : 0.5;
           return (
             <line
               key={i}
@@ -248,7 +240,7 @@ export default function AgentGraph({
               y2={t.y}
               stroke={stroke}
               strokeWidth={w}
-              strokeOpacity={l.kind === "fund" ? 0.32 : 0.22}
+              strokeOpacity={l.kind === "fund" ? 0.22 : 0.16}
               strokeLinecap="round"
             />
           );
@@ -281,15 +273,10 @@ export default function AgentGraph({
               <circle
                 r={r}
                 fill={color}
-                fillOpacity={n.kind === "patient" ? 0.95 : n.funded ? 0.85 : 0.5}
+                fillOpacity={n.kind === "patient" ? 0.9 : n.funded ? 0.88 : 0.45}
                 stroke={PALETTE.canvas}
-                strokeWidth={n.kind === "patient" ? 0.6 : 0.8}
+                strokeWidth={n.kind === "patient" ? 0.5 : 0.7}
               />
-              {labelled.has(n.id) && (
-                <text y={-r - 4} textAnchor="middle" fontSize={8.5} fill={PALETTE.muted} opacity={0.85}>
-                  {n.label}
-                </text>
-              )}
             </g>
           );
         })}

@@ -35,10 +35,10 @@ interface NodeDatum {
 }
 
 function radiusFor(spend: number): number {
-  // Small ambient dots when unfunded; grow with dollars. Tuned so ~90 metros
-  // read as a constellation rather than a clutter of fat circles.
-  if (spend <= 0) return 3.2;
-  return 5 + Math.min(Math.sqrt(spend) * 0.66, 24);
+  // Small ambient specks when unfunded; grow modestly with dollars. Capped low
+  // so dense metros read as a clean constellation, not a pile of fat halos.
+  if (spend <= 0) return 1.8;
+  return 3.2 + Math.min(Math.sqrt(spend) * 0.3, 8);
 }
 
 export default function UsMap({

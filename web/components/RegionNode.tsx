@@ -14,6 +14,9 @@ export interface RegionNodeProps {
   onLeave: () => void;
 }
 
+// A clean, restrained metro dot: a solid filled circle (no piled-up halos), a
+// thin dark seam to separate overlapping neighbours, and a single quiet pulse
+// only on the most recent allocation.
 export default function RegionNode({
   x,
   y,
@@ -37,27 +40,26 @@ export default function RegionNode({
           r={radius}
           fill="none"
           stroke={color}
-          strokeWidth={1.4}
-          initial={{ r: radius, opacity: 0.6 }}
-          animate={{ r: radius * 2.4, opacity: 0 }}
+          strokeWidth={1.2}
+          initial={{ r: radius, opacity: 0.55 }}
+          animate={{ r: radius * 2.2, opacity: 0 }}
           transition={{ duration: 1.2, repeat: Infinity, ease: "easeOut" }}
         />
       )}
-      {/* soft halo */}
-      <circle r={radius + 4} fill={color} opacity={funded ? 0.1 : 0.04} />
-      {/* main body */}
-      <circle
-        r={radius}
-        fill={color}
-        fillOpacity={funded ? 0.22 : 0.1}
-        stroke={color}
-        strokeOpacity={funded ? 0.9 : 0.45}
-        strokeWidth={1.4}
-      />
-      {/* core */}
-      <circle r={Math.max(radius * 0.32, 2.4)} fill={funded ? color : PALETTE.muted} />
-      {/* invisible larger hit area for hover */}
-      <circle r={radius + 10} fill="transparent" />
+      {funded ? (
+        <circle
+          r={radius}
+          fill={color}
+          fillOpacity={0.9}
+          stroke={PALETTE.canvas}
+          strokeWidth={0.8}
+        />
+      ) : (
+        // Ambient, unfunded metro — a faint speck that shapes the country.
+        <circle r={radius} fill={PALETTE.faint} fillOpacity={0.5} />
+      )}
+      {/* Larger invisible hit area for hover. */}
+      <circle r={radius + 9} fill="transparent" />
     </g>
   );
 }

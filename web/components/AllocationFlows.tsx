@@ -8,10 +8,10 @@ import { OUTCOME_COLOR, PALETTE } from "@/lib/palette";
 const COLORS = OUTCOME_COLOR;
 
 // How many of the most-recent flows stay "alive" (animated dashes + particle).
-const ACTIVE_WINDOW = 5;
-// Cap rendered threads so hundreds of allocations stay smooth — older arcs are
-// already "remembered" by the grown region nodes underneath.
-const MAX_THREADS = 120;
+const ACTIVE_WINDOW = 4;
+// Only the most recent arcs are drawn — older allocations are already conveyed
+// by the grown metro dots, so we keep the map calm rather than a web of lines.
+const MAX_THREADS = 48;
 
 export default function AllocationFlows({ flows }: { flows: FlowItem[] }) {
   if (flows.length === 0) return null;
@@ -27,9 +27,9 @@ export default function AllocationFlows({ flows }: { flows: FlowItem[] }) {
         const color = COLORS[flow.outcome] ?? PALETTE.slate;
         const recency = newestIndex - i; // 0 = newest
         const isActive = recency < ACTIVE_WINDOW;
-        // Older flows fade to faint persistent threads.
-        const baseOpacity = isActive ? 0.95 - recency * 0.18 : 0.16;
-        const width = isActive ? 2.2 - recency * 0.35 : 1;
+        // Thin, low-contrast threads that fade quickly into the background.
+        const baseOpacity = isActive ? 0.6 - recency * 0.12 : Math.max(0.08 - (recency - ACTIVE_WINDOW) * 0.0015, 0.04);
+        const width = isActive ? 1.4 - recency * 0.2 : 0.7;
 
         return (
           <Fragment key={flow.key}>
@@ -37,7 +37,7 @@ export default function AllocationFlows({ flows }: { flows: FlowItem[] }) {
               d={d}
               fill="none"
               stroke={color}
-              strokeWidth={Math.max(width, 0.8)}
+              strokeWidth={Math.max(width, 0.6)}
               strokeOpacity={baseOpacity}
               strokeLinecap="round"
             />
@@ -47,17 +47,15 @@ export default function AllocationFlows({ flows }: { flows: FlowItem[] }) {
                 d={d}
                 fill="none"
                 stroke={color}
-                strokeWidth={Math.max(width, 0.8)}
-                strokeOpacity={0.9}
+                strokeWidth={Math.max(width, 0.6)}
+                strokeOpacity={0.7}
                 strokeLinecap="round"
                 strokeDasharray="2 16"
-                style={{
-                  animation: "flow-dash 1.1s linear infinite",
-                }}
+                style={{ animation: "flow-dash 1.1s linear infinite" }}
               />
             )}
             {recency === 0 && (
-              <circle r={3.4} fill={PALETTE.gold}>
+              <circle r={2.6} fill={PALETTE.gold}>
                 <animateMotion dur="1.1s" repeatCount="indefinite" path={d} />
               </circle>
             )}
